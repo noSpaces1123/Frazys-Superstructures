@@ -80,7 +80,7 @@ function love.load()
 
     Level = 1
 
-    Boundary = { x = -40000, y = 0, width = 80000, height = nil, baseHeight = 4000, heightIncrement = 600 }
+    Boundary = { x = -40000, y = 0, width = 80000, height = nil, baseHeight = 4000, heightIncrement = 6000 }
     Boundary.height = Boundary.baseHeight
 
     Turrets = {}
@@ -113,7 +113,7 @@ function love.load()
     }
 
     EnemyGlobalData = {
-        enemyDensity = 0, baseEnemyDensity = 0.00000002,
+        enemyDensity = 0, baseEnemyDensity = 0.00000001,
         width = { min = 15, max = 30 },
         speed = { min = 3, max = 8, divide = 10 },
         viewRadius = { min = 800, max = 1000 },
@@ -984,7 +984,7 @@ function NextLevel()
     end
 end
 function CorrectBoundaryHeight()
-    Boundary.height = Boundary.baseHeight + (Level - 1) * Boundary.heightIncrement
+    Boundary.height = Boundary.baseHeight + math.floor(Level / 10) * Boundary.heightIncrement
 end
 function CorrectTurretDensity()
     ObjectGlobalData.turretDensity = ObjectGlobalData.baseTurretDensity + (Level - 1) * 0.00000002
