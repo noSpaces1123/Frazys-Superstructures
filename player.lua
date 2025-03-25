@@ -69,7 +69,7 @@ function UpdatePlayer()
     DoPlayerKeyPresses()
     UpdateKeyBuffer()
 
-    if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused then
+    if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running then
         Player.yvelocity = ApplyGravity(Player)
 
         UpdatePlayerCoyote()

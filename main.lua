@@ -213,9 +213,8 @@ function love.load()
         hooligmanCutscene = {
             running = false,
             text = "Hey! I'm the HOOLIGMAN! I'm displeased with your scrawny endeavors. The only way to escape is to reach the bottom of the level, but you won't live to see it! Hooligans, GET HIM!!!",
-            index = 1,
-            intro = { current = 0, max = 400 },
-            playing = {
+            intro = { current = 0, max = 100 },
+            dialogue = {
                 text = "", targetText = nil,
                 charInterval = { current = 0, max = 2, defaultMax = 2,
                     maxOn = { { char = ".", max = 20 }, { char = ",", max = 10 }, { char = "!", max = 20 }, { char = "?", max = 30 }, { char = "-", max = 40 } } },
@@ -674,13 +673,16 @@ function love.update(dt)
         if not Paused then
             TimeOnThisLevel = TimeOnThisLevel + dt
 
-            UpdateParticles()
-            UpdateTurrets()
-            UpdateBullets()
-            UpdateShrines()
-            UpdateMessages()
-            UpdateEnemies()
-            UpdateDialogue()
+            if not Descending.hooligmanCutscene.running then
+                UpdateParticles()
+                UpdateTurrets()
+                UpdateBullets()
+                UpdateShrines()
+                UpdateMessages()
+                UpdateEnemies()
+                UpdateDialogue()
+            end
+
             UpdateHooligmanCutscene()
             UpdateHooligmanDialogue()
         end
@@ -739,10 +741,11 @@ function love.draw()
 
             DrawMessages()
 
+            DrawHooligman()
+            DrawHooligmanDialogue()
+
             DrawCursorReadings()
             DrawDialogue()
-
-            DrawHooligmanDialogue()
 
             love.graphics.pop()
 
@@ -1016,7 +1019,7 @@ function NextLevel()
 
     if Level >= FinalLevel then
         FinalLevelReached()
-    elseif CheckIfDescending() then
+    elseif CheckIfShouldBeDescending() then
         PlayHooligmanCutscene()
         Descending.doingSo = true
     else
@@ -1078,7 +1081,7 @@ function FinalLevelReached()
 
     ResetGame()
 end
-function CheckIfDescending()
+function CheckIfShouldBeDescending()
     for _, on in ipairs(Descending.onLevels) do
         if on == Level then return true end
     end
@@ -1092,46 +1095,46 @@ end
 function UpdateHooligmanCutscene()
     if not Descending.hooligmanCutscene.running then return end
 
-    if Descending.hooligmanCutscene.intro >= Descending.hooligmanCutscene.intro.max then
+    if Descending.hooligmanCutscene.intro.current >= Descending.hooligmanCutscene.intro.max then
         PlayHooligmanDialogue(Descending.hooligmanCutscene.text)
+
+        if not Descending.hooligmanCutscene.dialogue.running then
+            Descending.hooligmanCutscene.running = false
+            Descending.doingSo = true
+        end
     else
         Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.current + 1 * GlobalDT
     end
-
-    if not Descending.hooligmanCutscene.playing.running then
-        Descending.hooligmanCutscene.running = false
-        Descending.doingSo = true
-    end
 end
 function UpdateHooligmanDialogue()
-    if Descending.hooligmanCutscene.dialogue.playing.running then
-        if Descending.hooligmanCutscene.dialogue.playing.finished then
-            Descending.hooligmanCutscene.dialogue.playing.text = string.sub(Descending.hooligmanCutscene.dialogue.playing.text, 1, #Descending.hooligmanCutscene.dialogue.playing.text - 1)
-            if #Descending.hooligmanCutscene.dialogue.playing.text == 0 then
-                Descending.hooligmanCutscene.dialogue.playing.running = false
+    if Descending.hooligmanCutscene.dialogue.running then
+        if Descending.hooligmanCutscene.dialogue.finished then
+            Descending.hooligmanCutscene.dialogue.text = string.sub(Descending.hooligmanCutscene.dialogue.text, 1, #Descending.hooligmanCutscene.dialogue.text - 1)
+            if #Descending.hooligmanCutscene.dialogue.text == 0 then
+                Descending.hooligmanCutscene.dialogue.running = false
             end
-        elseif Descending.hooligmanCutscene.dialogue.playing.charIndex > #Descending.hooligmanCutscene.dialogue.playing.targetText then
-            Descending.hooligmanCutscene.dialogue.playing.postWait.current = Descending.hooligmanCutscene.dialogue.playing.postWait.current + 1 * GlobalDT
-            if Descending.hooligmanCutscene.dialogue.playing.postWait.current >= Descending.hooligmanCutscene.dialogue.playing.postWait.max then
-                Descending.hooligmanCutscene.dialogue.playing.finished = true
+        elseif Descending.hooligmanCutscene.dialogue.charIndex > #Descending.hooligmanCutscene.dialogue.targetText then
+            Descending.hooligmanCutscene.dialogue.postWait.current = Descending.hooligmanCutscene.dialogue.postWait.current + 1 * GlobalDT
+            if Descending.hooligmanCutscene.dialogue.postWait.current >= Descending.hooligmanCutscene.dialogue.postWait.max then
+                Descending.hooligmanCutscene.dialogue.finished = true
             end
         else
-            Descending.hooligmanCutscene.dialogue.playing.charInterval.current = Descending.hooligmanCutscene.dialogue.playing.charInterval.current + 1 * GlobalDT
-            if Descending.hooligmanCutscene.dialogue.playing.charInterval.current >= Descending.hooligmanCutscene.dialogue.playing.charInterval.max then
-                local charToAdd = string.sub(Descending.hooligmanCutscene.dialogue.playing.targetText, Descending.hooligmanCutscene.dialogue.playing.charIndex, Descending.hooligmanCutscene.dialogue.playing.charIndex)
-                Descending.hooligmanCutscene.dialogue.playing.charInterval.current = Descending.hooligmanCutscene.dialogue.playing.charInterval.current - Descending.hooligmanCutscene.dialogue.playing.charInterval.max
-                Descending.hooligmanCutscene.dialogue.playing.text = Descending.hooligmanCutscene.dialogue.playing.text .. charToAdd
+            Descending.hooligmanCutscene.dialogue.charInterval.current = Descending.hooligmanCutscene.dialogue.charInterval.current + 1 * GlobalDT
+            if Descending.hooligmanCutscene.dialogue.charInterval.current >= Descending.hooligmanCutscene.dialogue.charInterval.max then
+                local charToAdd = string.sub(Descending.hooligmanCutscene.dialogue.targetText, Descending.hooligmanCutscene.dialogue.charIndex, Descending.hooligmanCutscene.dialogue.charIndex)
+                Descending.hooligmanCutscene.dialogue.charInterval.current = Descending.hooligmanCutscene.dialogue.charInterval.current - Descending.hooligmanCutscene.dialogue.charInterval.max
+                Descending.hooligmanCutscene.dialogue.text = Descending.hooligmanCutscene.dialogue.text .. charToAdd
 
                 local specialChar = false
-                for _, char in ipairs(Descending.hooligmanCutscene.dialogue.playing.charInterval.maxOn) do
+                for _, char in ipairs(Descending.hooligmanCutscene.dialogue.charInterval.maxOn) do
                     if char.char == charToAdd then
-                        Descending.hooligmanCutscene.dialogue.playing.charInterval.max = char.max
+                        Descending.hooligmanCutscene.dialogue.charInterval.max = char.max
                         specialChar = true
                     end
                 end
-                if not specialChar then Descending.hooligmanCutscene.dialogue.playing.charInterval.max = Descending.hooligmanCutscene.dialogue.playing.charInterval.defaultMax end
+                if not specialChar then Descending.hooligmanCutscene.dialogue.charInterval.max = Descending.hooligmanCutscene.dialogue.charInterval.defaultMax end
 
-                Descending.hooligmanCutscene.dialogue.playing.charIndex = Descending.hooligmanCutscene.dialogue.playing.charIndex + 1
+                Descending.hooligmanCutscene.dialogue.charIndex = Descending.hooligmanCutscene.dialogue.charIndex + 1
 
                 PlaySFX(SFX.hooligmanDialogue, 0.6, math.random()/2+.7)
             end
@@ -1139,18 +1142,18 @@ function UpdateHooligmanDialogue()
     end
 end
 function PlayHooligmanDialogue(text)
-    Descending.hooligmanCutscene.dialogue.playing.text = ""
-    Descending.hooligmanCutscene.dialogue.playing.charInterval.current = 0
-    Descending.hooligmanCutscene.dialogue.playing.charIndex = 1
-    Descending.hooligmanCutscene.dialogue.playing.charInterval.max = Descending.hooligmanCutscene.dialogue.playing.charInterval.defaultMax
-    Descending.hooligmanCutscene.dialogue.playing.running = true
-    Descending.hooligmanCutscene.dialogue.playing.targetText = text
-    Descending.hooligmanCutscene.dialogue.playing.finished = false
-    Descending.hooligmanCutscene.dialogue.playing.postWait.current = 0
+    Descending.hooligmanCutscene.dialogue.text = ""
+    Descending.hooligmanCutscene.dialogue.charInterval.current = 0
+    Descending.hooligmanCutscene.dialogue.charIndex = 1
+    Descending.hooligmanCutscene.dialogue.charInterval.max = Descending.hooligmanCutscene.dialogue.charInterval.defaultMax
+    Descending.hooligmanCutscene.dialogue.running = true
+    Descending.hooligmanCutscene.dialogue.targetText = text
+    Descending.hooligmanCutscene.dialogue.finished = false
+    Descending.hooligmanCutscene.dialogue.postWait.current = 0
 end
 function DrawHooligmanDialogue()
-    if not Descending.hooligmanCutscene.dialogue.playing.running then return end
-    DrawTextWithBackground(Descending.hooligmanCutscene.dialogue.playing.text, Player.x + Player.width / 2, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
+    if not Descending.hooligmanCutscene.dialogue.running then return end
+    DrawTextWithBackground(Descending.hooligmanCutscene.dialogue.text, Player.x + Player.width / 2, Player.y - 100, Fonts.dialogue, {1,0,0}, {0,0,0})
 end
 function DrawHooligman()
     if not Descending.hooligmanCutscene.running then return end
