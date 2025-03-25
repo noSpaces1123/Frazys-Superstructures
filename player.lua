@@ -926,6 +926,8 @@ function DrawMinimap()
     DrawLevelGoal()
 
     love.graphics.pop()
+
+    DrawTextWithBackground("Game is paused.", love.graphics.getWidth() / 2, love.graphics.getHeight() - 50, Fonts.normal, {1,1,1}, {0,0,0})
 end
 function InitialiseMinimapCoordinateAlterations()
     local zoom = Minimap.zoom

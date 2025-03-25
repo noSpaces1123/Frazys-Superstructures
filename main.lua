@@ -206,6 +206,11 @@ function love.load()
 
     FinalLevel = 50
 
+    Descending = {
+        onLevels = { math.floor(FinalLevel / 2), FinalLevel },
+        doingSo = false,
+    }
+
     Dialogue = {
         index = 1,
         playing = {
@@ -332,7 +337,7 @@ function love.load()
                 end
             },
             {
-                text = "Perfect. Now, when I die, I'll respawn here.",
+                text = "Perfect. Now, when I die, I'll respawn here. Intel says these checkpoints also destroy turrets and those bastard hooligans nearby.",
                 when = function ()
                     return Player.checkpoint.x ~= nil
                 end
@@ -533,6 +538,24 @@ function love.load()
                 text = "Ten levels left!",
                 when = function ()
                     return Level == 40
+                end
+            },
+            {
+                text = "10 deaths thus far...",
+                when = function ()
+                    return PlayerSkill.deaths == 10
+                end
+            },
+            {
+                text = "10 deaths.",
+                when = function ()
+                    return BestGameCompletionTime ~= nil and PlayerSkill.deaths == 10
+                end
+            },
+            {
+                text = "This is the final level. Let's do this.",
+                when = function ()
+                    return Level == 50
                 end
             },
         },
@@ -970,6 +993,7 @@ function NextLevel()
 
     if Level >= FinalLevel then
         FinalLevelReached()
+    elseif CheckIfDescending() then
     else
         Level = Level + 1
         Seed = os.time()
@@ -1028,6 +1052,12 @@ function FinalLevelReached()
     end
 
     ResetGame()
+end
+function CheckIfDescending()
+    for _, on in ipairs(Descending.onLevels) do
+        if on == Level then return true end
+    end
+    return false
 end
 
 function DrawLevelGoal()
@@ -1448,7 +1478,7 @@ function DrawShines()
 
         local width = (shrine.minimapVisible and ShrineGlobalData.width * 1.5 or ShrineGlobalData.width)
 
-        if Minimap.showing and false then goto continue end
+        if Minimap.showing then goto continue end
 
         love.graphics.setColor(color[1],color[2],color[3], 0.5)
 
