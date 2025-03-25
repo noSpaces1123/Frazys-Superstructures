@@ -90,7 +90,7 @@ function love.load()
     ObjectGlobalData = {
         cornerRadius = 3,
         strokeWidth = 4,
-        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.00000001, shrineDensity = 0.0000000005,
+        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000016, shrineDensity = 0.00000001,--0.0000000005,
         groundZeroNotchSpacing = 100, groundZeroNotchLength = 20,
         dangerPulseProgression = { current = 0, max = 500 },
         jumpPlatformStrength = 40,
@@ -611,7 +611,7 @@ function love.load()
 
     GameState = "menu"
 
-    Version = "1.1"
+    Version = "1.0"
 
     GlobalDT = 0
 end
@@ -919,7 +919,7 @@ function GenerateObjects()
 
     SpawnTurrets(playerSafeArea)
     SpawnCheckpoints()
-    if Dialogue.list[25].done then SpawnShrines() end
+    if Dialogue.list[25].done or true then SpawnShrines() end
     SpawnEnemies()
 end
 
@@ -1096,8 +1096,8 @@ function ExtendView()
     local angle = AngleBetween(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, love.mouse.getX(), love.mouse.getY())
     local distance = -Distance(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, love.mouse.getX(), love.mouse.getY())
 
-    local xTranslate = math.sin(angle) * distance
-    local yTranslate = math.cos(angle) * distance
+    local xTranslate = math.sin(angle) * distance * 1.5
+    local yTranslate = math.cos(angle) * distance * 1.5
 
     if love.keyboard.isDown("lshift") then
 
@@ -1411,8 +1411,21 @@ function SpawnShrines()
     end
 end
 function NewShrine(x, y)
+    local palette = ShrineGenerationPalette
+    for key, value in pairs(PlayerPerks) do
+        if value then
+            palette[key] = 0
+        end
+    end
+
+    local allZero = true
+    for _, value in pairs(palette) do
+        if value ~= 0 then allZero = false end
+    end
+    if allZero then return end
+
     table.insert(Shrines, {
-        x = x, y = y,
+        x = x - ShrineGlobalData.width / 2, y = y - ShrineGlobalData.width / 2, effect = lume.weightedchoice(palette)
     })
 
     for _, obj in ipairs(Objects) do
@@ -1434,9 +1447,9 @@ function DrawShines()
 
         local width = (shrine.minimapVisible and ShrineGlobalData.width * 1.5 or ShrineGlobalData.width)
 
-        if Minimap.showing then goto continue end
+        if Minimap.showing and false then goto continue end
 
-        love.graphics.setColor(color)
+        love.graphics.setColor(color[1],color[2],color[3], 0.5)
 
         love.graphics.push()
 
@@ -1445,6 +1458,10 @@ function DrawShines()
         love.graphics.rectangle("fill", -width / 2, -width / 2, width, width)
 
         love.graphics.pop()
+
+        color = {0,0,0}
+        color[math.random(#color)] = 1
+        DrawTextWithBackground(shrine.effect, shrine.x + width / 2, shrine.y + width / 2, Fonts.big, color, {0,0,0,0})
 
         ::continue::
 
@@ -1459,43 +1476,25 @@ function UpdateShrines()
         ShrineGlobalData.spin = 0
     end
 
-    for index, shrine in ipairs(Shrines) do
+    for _, shrine in ipairs(Shrines) do
         if Touching(shrine.x, shrine.y, ShrineGlobalData.width, ShrineGlobalData.width, Player.x, Player.y, Player.width, Player.height) then
             PlaySFX(SFX.shrine, 0.6, math.random()/10+.95)
 
-            local palette = ShrineGenerationPalette
-            for key, value in pairs(PlayerPerks) do
-                if value then
-                    palette[key] = 0
-                end
-            end
-
-            local allZero = true
-            for key, value in pairs(palette) do
-                if value ~= 0 then allZero = false end
-            end
-            if allZero then goto continue end
-
-            local effect = lume.weightedchoice(palette)
-
-            local shrineEffect = ShrineGlobalData.types[effect]
+            local shrineEffect = ShrineGlobalData.types[shrine.effect]
             shrineEffect.func()
 
-            PlayerPerks[effect] = true
+            PlayerPerks[shrine.effect] = true
 
             ApplyShrineEffects()
 
             for _ = 1, 20 do
-                local color = {0,0,0}
-                color[math.random(#color)] = 1
-
-                table.insert(Particles, NewParticle(shrine.x, shrine.y, math.random() * 6, color, math.random() * 9 + 3, math.random(360), 0.02, math.random(300, 500), function (self)
+                table.insert(Particles, NewParticle(shrine.x, shrine.y, math.random() * 6, {0,0,0}, math.random() * 9 + 3, math.random(360), 0.02, math.random(300, 500), function (self)
                     self.color = {0,0,0}
-                    color[math.random(#color)] = 1
+                    self.color[math.random(#self.color)] = 1
                 end))
             end
 
-            NewMessage(effect, Player.x + Player.width / 2, Player.y - 100, shrineEffect.color, 200, Fonts.big)
+            NewMessage(shrine.effect, Player.x + Player.width / 2, Player.y - 100, shrineEffect.color, 200, Fonts.big)
 
             SaveData()
 
@@ -1503,8 +1502,6 @@ function UpdateShrines()
 
             goto outOfLoop
         end
-
-        ::continue::
     end
 
     ::outOfLoop::
