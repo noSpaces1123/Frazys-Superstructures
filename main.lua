@@ -57,6 +57,7 @@ function love.load()
 
     Fonts = {
         normal = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 17),
+        dialogue = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 27),
         medium = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 23),
         big = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 29),
         time = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 300),
@@ -90,7 +91,7 @@ function love.load()
     ObjectGlobalData = {
         cornerRadius = 3,
         strokeWidth = 4,
-        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000016, shrineDensity = 0.00000001,--0.0000000005,
+        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000016, shrineDensity = 0.0000000005,
         groundZeroNotchSpacing = 100, groundZeroNotchLength = 20,
         dangerPulseProgression = { current = 0, max = 500 },
         jumpPlatformStrength = 40,
@@ -145,39 +146,39 @@ function love.load()
         maxHintDistance = 15000,
         types = {
             ["Spirit of the Frozen Trekker"] = {
-                color = {0,1,1},
+                color = {0,1,1}, explanation = "This shrine keeps you from slipping around on ice.",
                 func = function () end
             },
             ["Will of the Frogman"] = {
-                color = {0,1,0},
+                color = {0,1,0}, explanation = "This shrine gives you a bigger super jump bar.",
                 func = function () end
             },
             ["Blood of the Man in White"] = {
-                color = {0,1,1},
+                color = {0,1,1}, explanation = "This shrine makes you passively cool faster.",
                 func = function () end
             },
             ["Scale of the Rampant Mouse"] = {
-                color = {1,0,0},
+                color = {1,0,0}, explanation = "This shrine makes you smaller.",
                 func = function () end
             },
             ["Eye of the Crimson Eagle"] = {
-                color = {.8,0,0},
+                color = {.8,0,0}, explanation = "This shrine increases your range of sight.",
                 func = function () end
             },
             ["Instinct of the Bullet Jumper"] = {
-                color = {1,0,1},
+                color = {1,0,1}, explanation = "This shrine has bullets close to you slow down.",
                 func = function () end
             },
             ["Power of the Achiever"] = {
-                color = {1,1,0},
+                color = {1,1,0}, explanation = "This shrine lets you double-jump. Fun!",
                 func = function () end
             },
             ["Wings of the Guardian Angel"] = {
-                color = {1,1,1},
+                color = {1,1,1}, explanation = "This shrine lets you glide in the air by holding [SPACE].",
                 func = function () end
             },
             ["Essence of the Grasshopper"] = {
-                color = {0,1,0},
+                color = {0,1,0}, explanation = "This shrine lets you jump much higher.",
                 func = function () end
             },
         },
@@ -218,7 +219,7 @@ function love.load()
         },
         list = {
             {
-                text = "I hope my team knows what they're doing sending me here. I hear this place is dangerous.",
+                text = "I hope my team knows what they're doing sending me here. I hear this place is dangerous, but all I need to do is reach the top of each level.",
                 when = function () return
                     Level == 1
                 end
@@ -1494,7 +1495,7 @@ function UpdateShrines()
                 end))
             end
 
-            NewMessage(shrine.effect, Player.x + Player.width / 2, Player.y - 100, shrineEffect.color, 200, Fonts.big)
+            NewMessage(shrine.effect .. ": " .. ShrineGlobalData.types[shrine.effect].explanation, 0, 100, {0,1,0}, 500, Fonts.big, nil, true)
 
             SaveData()
 
@@ -1607,7 +1608,7 @@ function GenerateBG()
     end
 end
 
-function NewMessage(text, x, y, color, lifespan, font, followEnemyIndex)
+function NewMessage(text, x, y, color, lifespan, font, followEnemyIndex, followPlayer)
     table.insert(Messages, {
         x = x, y = y, life = lifespan, followEnemyIndex = followEnemyIndex,
         draw = function (self)
@@ -1624,6 +1625,9 @@ function NewMessage(text, x, y, color, lifespan, font, followEnemyIndex)
             if followEnemyIndex ~= nil and Enemies[followEnemyIndex] ~= nil then
                 self.x = Enemies[followEnemyIndex].x + x
                 self.y = Enemies[followEnemyIndex].y + y
+            elseif followPlayer then
+                self.x = Player.x + x
+                self.y = Player.y + y
             end
         end
     })

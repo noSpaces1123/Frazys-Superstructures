@@ -1055,5 +1055,5 @@ function PlayDialogue(index, event)
 end
 function DrawDialogue()
     if not Dialogue.playing.running then return end
-    DrawTextWithBackground(Dialogue.playing.text, Player.x + Player.width / 2, Player.y - 100, Fonts.medium, {0,1,1}, {0,0,0})
+    DrawTextWithBackground(Dialogue.playing.text, Player.x + Player.width / 2, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
 end
