@@ -224,6 +224,9 @@ function love.load()
                 postWait = { current = 0, max = 200 },
                 running = false,
             },
+            hooligman = {
+                width = 1000,
+            }
         },
     }
 
@@ -678,6 +681,8 @@ function love.update(dt)
             UpdateMessages()
             UpdateEnemies()
             UpdateDialogue()
+            UpdateHooligmanCutscene()
+            UpdateHooligmanDialogue()
         end
 
         --CheckForOddities()
@@ -736,6 +741,8 @@ function love.draw()
 
             DrawCursorReadings()
             DrawDialogue()
+
+            DrawHooligmanDialogue()
 
             love.graphics.pop()
 
@@ -1080,10 +1087,16 @@ end
 
 function PlayHooligmanCutscene()
     Descending.hooligmanCutscene.running = true
-    PlayHooligmanDialogue(Descending.hooligmanCutscene.text)
+    Descending.hooligmanCutscene.intro.current = 0
 end
 function UpdateHooligmanCutscene()
     if not Descending.hooligmanCutscene.running then return end
+
+    if Descending.hooligmanCutscene.intro >= Descending.hooligmanCutscene.intro.max then
+        PlayHooligmanDialogue(Descending.hooligmanCutscene.text)
+    else
+        Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.current + 1 * GlobalDT
+    end
 
     if not Descending.hooligmanCutscene.playing.running then
         Descending.hooligmanCutscene.running = false
@@ -1091,13 +1104,6 @@ function UpdateHooligmanCutscene()
     end
 end
 function UpdateHooligmanDialogue()
-    for index, dialogue in ipairs(Descending.hooligmanCutscene.dialogue.list) do
-        if dialogue.when() and not dialogue.done then
-            PlayDialogue(index)
-            dialogue.done = true
-        end
-    end
-
     if Descending.hooligmanCutscene.dialogue.playing.running then
         if Descending.hooligmanCutscene.dialogue.playing.finished then
             Descending.hooligmanCutscene.dialogue.playing.text = string.sub(Descending.hooligmanCutscene.dialogue.playing.text, 1, #Descending.hooligmanCutscene.dialogue.playing.text - 1)
@@ -1147,7 +1153,22 @@ function DrawHooligmanDialogue()
     DrawTextWithBackground(Descending.hooligmanCutscene.dialogue.playing.text, Player.x + Player.width / 2, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
 end
 function DrawHooligman()
-    
+    if not Descending.hooligmanCutscene.running then return end
+
+    local x, y = Player.x - Descending.hooligmanCutscene.hooligman.width / 2, -Descending.hooligmanCutscene.intro.current - 300
+    local width = Descending.hooligmanCutscene.hooligman.width
+
+    love.graphics.setColor(1,0,0)
+    love.graphics.rectangle("fill", x, y, width, width)
+
+
+    local multiply = width / 6
+    local angle = AngleBetween(x + width / 2, y + width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+    local eyeX, eyeY = x + width / 2 + math.sin(angle) * multiply, y + width / 2 + math.cos(angle) * multiply
+    local eyeWidth = width * 0.5
+
+    love.graphics.setColor(0,0,0)
+    love.graphics.rectangle("fill", eyeX - eyeWidth / 2, eyeY - eyeWidth / 2, eyeWidth, eyeWidth)
 end
 
 function DrawLevelGoal()
