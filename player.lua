@@ -99,7 +99,7 @@ function love.keypressed(key)
     if key == "escape" then
         GameState = "menu"
         SaveData()
-    elseif not Player.respawnWait.dead and not Paused and key ~= "d" and key ~= "a" then
+    elseif not Player.respawnWait.dead and key ~= "d" and key ~= "a" then
         table.insert(KeyBuffer, { key = key, time = 10 })
     end
 end

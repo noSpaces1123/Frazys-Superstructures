@@ -134,6 +134,8 @@ function DoEnemyCollisions(enemyIndex)
                 closestSide = obj.enemyTouchingSide
             end
 
+            if Enemies[enemyIndex] == nil then goto continue end
+
             local bounce = 5
             local swapYVel = function ()
                 Enemies[enemyIndex].yvelocity = -Enemies[enemyIndex].yvelocity * EnemyGlobalData.bounceReverberation + (Enemies[enemyIndex].yvelocity > 0 and -bounce or bounce)
@@ -162,6 +164,8 @@ function DoEnemyCollisions(enemyIndex)
             end
 
             obj.enemyTouchingSide = closestSide
+
+            ::continue::
         else
             obj.enemyTouchingSide = nil
         end
