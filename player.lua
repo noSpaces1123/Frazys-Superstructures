@@ -27,7 +27,7 @@ function LoadPlayer()
 end
 function RespawnPlayer()
     if Player.checkpoint.x == nil and Player.checkpoint.y == nil then
-        Player.x, Player.y = 0, Boundary.y + Boundary.height
+        Player.x, Player.y = 0, (Descending.doingSo and 0 or Boundary.y + Boundary.height)
     else
         Player.x, Player.y = Player.checkpoint.x, Player.checkpoint.y
     end
@@ -437,7 +437,7 @@ function ConvertXIntoYVelocity()
 end
 
 function CheckIfPlayerHasCompletedLevel()
-    if Player.y <= 0 then
+    if Player.y <= 0 and not Descending.doingSo then
         NextLevel()
     end
 end
