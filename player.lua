@@ -261,7 +261,7 @@ function DoPlayerKeyPresses()
         if love.keyboard.isDown("d") then
             Minimap.x = Minimap.x + Minimap.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
         end
-    elseif not Player.respawnWait.dead and not Paused then
+    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running then
         Player.pressing.a = love.keyboard.isDown("a")
         Player.pressing.d = love.keyboard.isDown("d")
 

@@ -36,6 +36,7 @@ function love.load()
         complete = love.audio.newSource("assets/sfx/complete.wav", "static"),
         resetRun = love.audio.newSource("assets/sfx/reset run.wav", "static"),
         zoom = love.audio.newSource("assets/sfx/zoom.wav", "static"),
+        descended = love.audio.newSource("assets/sfx/descended.wav", "static"),
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
@@ -584,6 +585,12 @@ function love.load()
                 text = "Whoa! That was insane. I can't believe I made it outta there! Let's hope I don't have to go through that again...",
                 when = function ()
                     return Level == 26
+                end
+            },
+            {
+                text = "Intel says I can use [SHIFT] to get some extra sight.",
+                when = function ()
+                    return Level == 7
                 end
             },
         },
