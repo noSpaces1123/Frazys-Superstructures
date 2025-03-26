@@ -210,6 +210,7 @@ function love.load()
     Descending = {
         onLevels = { math.floor(FinalLevel / 2), FinalLevel },
         doingSo = false,
+        music = love.audio.newSource("assets/music/Complex Numbers.wav", "stream"),
         hooligmanCutscene = {
             running = false,
             text = "Hey! I'm the HOOLIGMAN! I'm displeased with your scrawny endeavors. The only way to escape is to reach the bottom of the level, but will you live to see it? No. Hooligans, GO!",
@@ -229,6 +230,8 @@ function love.load()
             }
         },
     }
+    Descending.music:setLooping(true)
+    Descending.music:setVolume(0.5)
 
     Dialogue = {
         index = 1,
@@ -575,6 +578,12 @@ function love.load()
                 text = "This is the final level. Let's do this.",
                 when = function ()
                     return Level == 50
+                end
+            },
+            {
+                text = "Whoa! That was insane. I can't believe I made it outta there! Let's hope I don't have to go through that again...",
+                when = function ()
+                    return Level == 26
                 end
             },
         },
@@ -1014,13 +1023,18 @@ function Touching(x1, y1, w1, h1, x2, y2, w2, h2)
     return x1 + w1 >= x2 and y1 + h1 >= y2 and x1 <= x2 + w2 and y1 <= y2 + h2
 end
 
+function CheckIfPlayerHasCompletedLevel()
+    if ((Descending.doingSo and Player.y >= Boundary.y + Boundary.height) or (not Descending.doingSo and Player.y <= 0)) then
+        NextLevel()
+    end
+end
 function NextLevel()
     TotalTime = TotalTime + TimeOnThisLevel
     TimeOnThisLevel = 0
 
     if Level >= FinalLevel then
         FinalLevelReached()
-    elseif CheckIfShouldBeDescending() then
+    elseif CheckIfShouldBeDescending() and not Descending.hooligmanCutscene.running and not Descending.doingSo then
         PlayHooligmanCutscene()
     else
         Level = Level + 1
@@ -1034,6 +1048,12 @@ function NextLevel()
         ApplyShrineEffects()
 
         NextLevelAnimation.running = true
+
+        if Descending.doingSo then
+            Descending.doingSo = false
+            Descending.music:stop()
+            Music:play()
+        end
     end
 end
 function CorrectBoundaryHeight()
@@ -1089,6 +1109,7 @@ function CheckIfShouldBeDescending()
 end
 
 function PlayHooligmanCutscene()
+    Music:pause()
     Descending.hooligmanCutscene.running = true
     Descending.hooligmanCutscene.intro.current = 0
 end
@@ -1106,9 +1127,12 @@ function UpdateHooligmanCutscene()
             Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.max - 1
 
             Turrets, Enemies = {}, {}
-            EnemyGlobalData.enemyDensity = 0.000002
+            EnemyGlobalData.enemyDensity = 0.0000015
+            Player.checkpoint.x, Player.checkpoint.y = nil, nil
             SpawnEnemies()
             SaveData()
+            table.remove(Objects, 1)
+            Descending.music:play()
         end
     elseif Descending.doingSo and Descending.hooligmanCutscene.intro.current > 0 then
         Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.current - 1 * GlobalDT
@@ -1190,7 +1214,8 @@ function DrawHooligman()
 end
 
 function DrawLevelGoal()
-    if Descending.doingSo or Descending.hooligmanCutscene.running then return end
+    local flipped = Descending.doingSo or Descending.hooligmanCutscene.running
+    local y = (flipped and Boundary.y + Boundary.height or Boundary.y)
 
     love.graphics.setColor(0,1,0)
     love.graphics.setLineWidth(2)
@@ -1198,18 +1223,18 @@ function DrawLevelGoal()
     local lineLength = 3
 
     for x = Boundary.x, (Boundary.x + Boundary.width), lineLength * 2 do
-        love.graphics.line(x, 0, x + lineLength, 0)
+        love.graphics.line(x, y, x + lineLength, y)
     end
 
     local numberOfLines = 100
     love.graphics.setColor(0,1,0,0.3)
     for i = -1000, love.graphics.getWidth(), love.graphics.getWidth() / numberOfLines do
         local x, _ = love.graphics.inverseTransformPoint(i, 0)
-        love.graphics.line(x, 0, x + 2000, -2000)
+        love.graphics.line(x, y, x + 2000, y + (flipped and 1 or -1) * 2000)
     end
 
-    DrawTextWithBackground(TimeInSecondsToStupidFuckingHumanFormat(TimeOnThisLevel), (Minimap.showing and Minimap.x or Player.x), Boundary.y - (Minimap.showing and 800 or 400), Fonts.time, {0,1,0}, {0,0,0,0})
-    DrawTextWithBackground(TimeInSecondsToStupidFuckingHumanFormat(TotalTime + TimeOnThisLevel) .. " in total", (Minimap.showing and Minimap.x or Player.x), Boundary.y - (Minimap.showing and 1200 or 800), Fonts.smallTime, {0,1,0}, {0,0,0,0})
+    DrawTextWithBackground(TimeInSecondsToStupidFuckingHumanFormat(TimeOnThisLevel), (Minimap.showing and Minimap.x or Player.x), Boundary.y + (flipped and Boundary.height or 0) + (flipped and 1 or -1) * (Minimap.showing and 800 or 400), Fonts.time, {0,1,0}, {0,0,0,0})
+    DrawTextWithBackground(TimeInSecondsToStupidFuckingHumanFormat(TotalTime + TimeOnThisLevel) .. " in total", (Minimap.showing and Minimap.x or Player.x), Boundary.y + (flipped and Boundary.height or 0) + (flipped and 1 or -1) * (Minimap.showing and 1200 or 800), Fonts.smallTime, {0,1,0}, {0,0,0,0})
 end
 function TimeInSecondsToStupidFuckingHumanFormat(time)
     local seconds = tostring(math.floor(time % 60))

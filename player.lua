@@ -436,12 +436,6 @@ function ConvertXIntoYVelocity()
     Player.xvelocity = 0
 end
 
-function CheckIfPlayerHasCompletedLevel()
-    if Player.y <= 0 and not Descending.doingSo then
-        NextLevel()
-    end
-end
-
 function ConvertPlayerVelocityToZoom()
     local minVelocity = 15
     local zoom = 1 - Clamp(math.abs(Player.xvelocity) / 200 - minVelocity / 300, 0, math.huge) / 2

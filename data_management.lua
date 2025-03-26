@@ -6,7 +6,7 @@ function SaveData()
 
     local data = {
         objects = Objects, turrets = Turrets, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
-        level = Level, player = { x = Player.x, y = -10, xvelocity = Player.xvelocity, yvelocity = Player.yvelocity, temperature = Player.temperature, superJump = Player.superJump },
+        level = Level, player = { x = Player.x, y = Player.y, xvelocity = Player.xvelocity, yvelocity = Player.yvelocity, temperature = Player.temperature, superJump = Player.superJump },
         playerSkill = { turretsDestroyed = PlayerSkill.turretsDestroyed, deaths = PlayerSkill.deaths, greatestBulletPresence = PlayerSkill.greatestBulletPresence, enemiesKilled = PlayerSkill.enemiesKilled },
         wayPoints = WayPoints, playerPerks = PlayerPerks, timeOnThisLevel = TimeOnThisLevel, dialogueDone = dialogueDone, totalTime = TotalTime, deathPositions = DeathPositions,
         enemies = Enemies, bestGameCompletionTime = BestGameCompletionTime, settings = Settings,
