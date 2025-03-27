@@ -58,6 +58,10 @@ function ResetGame()
     TotalTime = 0
     ResetPlayerData()
     LoadPlayer()
+    CorrectBoundaryHeight()
+    CorrectEnemyDensity()
+    CorrectTurretDensity()
+    Descending.onLevels = PickDescensionLevels()
     GenerateObjects()
     SaveData()
     LoadData()
@@ -146,7 +150,11 @@ function UpdateKeyBuffer()
         elseif key == "m" and GameState == "game" then
             ToggleMinimap()
         elseif key == "p" and not Minimap.showing and GameState == "game" then
-            Paused = not Paused
+            if Paused then
+                StartSlowMo(false, false, true)
+            else
+                StartSlowMo(true, true, false)
+            end
         elseif key == "r" and Paused and GameState == "game" then
             GenerateObjects()
             LoadPlayer()
@@ -268,7 +276,7 @@ function DoPlayerKeyPresses()
         if love.keyboard.isDown("d") then
             Minimap.x = Minimap.x + Minimap.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
         end
-    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running and not Player.touchingStickyObject then
+    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running and not Player.touchingStickyObject and PlayerCanMove then
         Player.pressing.a = love.keyboard.isDown("a")
         Player.pressing.d = love.keyboard.isDown("d")
 
@@ -279,6 +287,13 @@ function DoPlayerKeyPresses()
         if Player.pressing.d then
             Player.xvelocity = Player.xvelocity + Player.speed * GlobalDT
         end
+
+        --[[
+        if love.keyboard.isDown("o") then
+            Player.yvelocity = Player.yvelocity - 2 * GlobalDT
+        elseif love.keyboard.isDown("l") then
+            Player.yvelocity = Player.yvelocity + 2 * GlobalDT
+        end]]
     end
 end
 
@@ -1037,6 +1052,7 @@ function UpdateDialogue()
                 Dialogue.playing.running = false
             end
         elseif Dialogue.playing.charIndex > #Dialogue.playing.targetText then
+            PlayerCanMove = true
             Dialogue.playing.postWait.current = Dialogue.playing.postWait.current + 1 * GlobalDT
             if Dialogue.playing.postWait.current >= Dialogue.playing.postWait.max then
                 Dialogue.playing.finished = true

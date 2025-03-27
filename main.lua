@@ -55,6 +55,8 @@ function love.load()
 
     Sprites = {
         cross = love.graphics.newImage("assets/sprites/cross.png", {dpiscale=10}),
+        controls = love.graphics.newImage("assets/sprites/controls.png", {dpiscale=8}),
+        fullControls = love.graphics.newImage("assets/sprites/full controls.png", {dpiscale=7}),
     }
 
     Fonts = {
@@ -232,12 +234,16 @@ function love.load()
     FinalLevel = 50
 
     Descending = {
-        onLevels = { math.floor(FinalLevel / 2), FinalLevel },
+        onLevels = PickDescensionLevels(),
         doingSo = false,
         music = love.audio.newSource("assets/music/Complex Numbers.wav", "stream"),
         hooligmanCutscene = {
             running = false,
-            text = "Hey! I'm the HOOLIGMAN! I'm displeased with your scrawny endeavors. The only way to escape is to reach the bottom of the level, but will you live to see it? No. Hooligans, GO!",
+            text = {
+                "Hey! I'm the HOOLIGMAN! I'm displeased with your scrawny endeavors. The only way to escape is to reach the bottom of the level, but will you live to see it? No. Hooligans, GO!",
+                "I'm back! And you're still alive. Time to die. Hooligans, DON'T FAIL ME THIS TIME!",
+                "You and your scrawny endeavors have messed with my superstructures enough. TAKE YOUR LAST BREATH.",
+            },
             intro = { current = 0, max = 100 },
             startedDialogue = false,
             dialogue = {
@@ -353,7 +359,7 @@ function love.load()
                 end
             },
             {
-                text = "Victor at HQ will be happy to see the progress.",
+                text = "It looks like the height of the levels increases every ten levels. Let's keep that in mind.",
                 when = function ()
                     return Level == 10
                 end
@@ -419,7 +425,7 @@ function love.load()
                 end
             },
             {
-                text = "Victor said I only need to reach level 50 to get enough info and head home.",
+                text = "Victor at Intel said I only need to reach level 50 to get enough info and head home.",
                 when = function ()
                     return Level >= 11
                 end
@@ -445,7 +451,9 @@ function love.load()
             {
                 text = "Intel said they're getting strange signals from each of these levels... I should explore to find out what they are.",
                 when = function ()
-                    return Level >= 15 and Player.y <= Boundary.y + Boundary.height / 2
+                    local condition = Level >= 15 and Player.y <= Boundary.y + Boundary.height / 2
+                    if condition then SpawnShrines() end
+                    return condition
                 end
             },
             {
@@ -509,9 +517,9 @@ function love.load()
                 end
             },
             {
-                text = "All the intel under ten minutes, done. Once a boy- now a man.",
+                text = "All the intel under an hour, done. Once a boy- now a man.",
                 when = function ()
-                    return BestGameCompletionTime ~= nil and BestGameCompletionTime < 10 * 60
+                    return BestGameCompletionTime ~= nil and BestGameCompletionTime < 60 * 60
                 end
             },
             {
@@ -616,6 +624,12 @@ function love.load()
                     return Level == 7
                 end
             },
+            {
+                text = "All the intel collected in under an hour and a half! But I bet I can do it faster.",
+                when = function ()
+                    return BestGameCompletionTime ~= nil and BestGameCompletionTime < 90 * 60
+                end
+            },
         },
         eventual = {
             killEnemy = {
@@ -625,9 +639,17 @@ function love.load()
                 "Ha-ha!",
                 "Idiot.",
                 "Oh yeah.",
+                "How cute.",
+                "Beat that.",
+                "Goof.",
+                "Hole in one.",
+                "Who's the man?",
+                "No mercy.",
             },
         },
     }
+
+    PlayerCanMove = false
 
     DeathPositions = {}
 
@@ -719,11 +741,18 @@ function love.load()
     - New: Jumping off the bottom of platforms
 ]]
 
+    TimeMultiplier = 1
+    SlowMo = { current = 0, max = 20, slowingDown = false, running = false }
+
+    GlobalUnaffectedDT = 0
     GlobalDT = 0
 end
 
 function love.update(dt)
-    GlobalDT = dt * 60
+    GlobalUnaffectedDT = dt * 60
+    GlobalDT = GlobalUnaffectedDT * TimeMultiplier
+
+    UpdateSlowMo()
 
     if GameState == "game" then
         UpdatePlayer()
@@ -798,6 +827,13 @@ function love.draw()
             DrawBullets()
 
             DrawPlayerAlignmentAxes()
+
+            love.graphics.setColor(1,1,1)
+            if Level == 1 and PlayerCanMove then
+                love.graphics.draw(Sprites.controls, -Sprites.controls:getWidth() / 2, Boundary.y + Boundary.height - 300)
+            elseif Level == 5 then
+                love.graphics.draw(Sprites.fullControls, -Sprites.fullControls:getWidth() / 2, Boundary.y + Boundary.height - 300)
+            end
 
             DisplayTurretInfo()
 
@@ -1162,7 +1198,13 @@ function UpdateHooligmanCutscene()
 
     if Descending.hooligmanCutscene.intro.current >= Descending.hooligmanCutscene.intro.max then
         if not Descending.hooligmanCutscene.startedDialogue then
-            PlayHooligmanDialogue(Descending.hooligmanCutscene.text)
+            local i
+            for index, lvl in ipairs(Descending.onLevels) do
+                if lvl == Level then i = index end
+            end
+            assert(i, "cutscene occured on invalid level")
+
+            PlayHooligmanDialogue(Descending.hooligmanCutscene.text[i])
             Descending.hooligmanCutscene.startedDialogue = true
         end
 
@@ -1905,15 +1947,22 @@ function InitialiseRegularCoordinateAlterations()
 end
 
 function DrawPausedOverlay()
-    if Paused then
-        love.graphics.setColor(0,0,0,0.2)
+    if Paused or (SlowMo.running and (SlowMo.toPause or SlowMo.toUnpause)) then
+        local alpha = 0.2
+        local multiplier = EaseInOutCubic((SlowMo.running and (SlowMo.slowingDown and SlowMo.current or SlowMo.max - SlowMo.current) / SlowMo.max or 1))
+        love.graphics.setColor(0,0,0, multiplier * alpha)
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
-        DrawTextWithBackground("Paused.", love.graphics.getWidth()/2, love.graphics.getHeight() - 200, Fonts.big, {1,1,1}, {0,0,0})
+        DrawTextWithBackground("Paused.", love.graphics.getWidth()/2, love.graphics.getHeight() - 200, Fonts.big, {1,1,1,multiplier}, {0,0,0,multiplier})
+        DrawTextWithBackground("[P] to unpause.", love.graphics.getWidth()/2, love.graphics.getHeight() - 150, Fonts.medium, {1,1,1,multiplier}, {0,0,0,multiplier})
 
         love.graphics.setFont(Fonts.normal)
-        love.graphics.setColor(1,1,1)
+        love.graphics.setColor(1,1,1, multiplier)
         love.graphics.print(Version, 5, love.graphics.getHeight() - Fonts.normal:getHeight() - 5)
+
+        local generalPadding = 10
+        local scale = 0.6
+        love.graphics.draw(Sprites.fullControls, love.graphics.getWidth() - generalPadding - Sprites.controls:getWidth() * scale, love.graphics.getHeight() - generalPadding - Sprites.controls:getHeight() * scale, 0, scale,scale)
     end
 end
 
@@ -2009,4 +2058,33 @@ function InitialiseButtons()
     end, nil, function (self)
         return GameState == "settings"
     end)
+end
+
+function PickDescensionLevels()
+    return { 17 - math.random(0, 3), 37 - math.random(0, 4), 50 }
+end
+
+function StartSlowMo(slowingDown, toPause, toUnpause)
+    SlowMo.running = true
+    SlowMo.slowingDown = slowingDown
+    SlowMo.toPause = toPause
+    SlowMo.toUnpause = toUnpause
+
+    if toUnpause then
+        Paused = false
+    end
+end
+function UpdateSlowMo()
+    if not SlowMo.running then return end
+
+    SlowMo.current = SlowMo.current + 1 * GlobalUnaffectedDT
+    TimeMultiplier = EaseInOutCubic((SlowMo.slowingDown and SlowMo.max - SlowMo.current or SlowMo.current) / SlowMo.max)
+    if SlowMo.current >= SlowMo.max then
+        SlowMo.running = false
+        SlowMo.current = 0
+
+        if SlowMo.toPause then
+            Paused = true
+        end
+    end
 end
