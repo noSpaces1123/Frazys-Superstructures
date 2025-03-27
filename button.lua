@@ -35,8 +35,9 @@ function NewButton(text, x, y, width, height, lineColor, fillColor, mouseOverFil
             end
         end,
         mouseClick = function (self, key)
-            if self.mouseOver and self.enable() then
+            if self.mouseOver and self.enable() and not ClickedWithMouse then
                 self.func(self)
+                ClickedWithMouse = true
                 PlaySFX(SFX.click, 0.6, 1)
             end
         end

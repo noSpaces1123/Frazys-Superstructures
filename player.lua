@@ -4,7 +4,7 @@ function LoadPlayer()
         width = 10, height = 10, color = { 0,1,1 }, zoom = 0.4,
         speed = 0.4, netSpeed = 0, jumpStrength = 23, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
-        standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false },
+        standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false }, touchingStickyObject = false, touchingBottomOfObject = false,
         coyote = { current = 0, max = 10, running = false },
         groundFriction = 1, airFriction = 0.1,
         moving = false,
@@ -74,8 +74,8 @@ function UpdatePlayer()
 
         UpdatePlayerCoyote()
         DoPlayerSpeedParticles()
-        DoPlayerMovement(true)
         DoObjectEffects()
+        DoPlayerMovement(true)
         UpdateBlips()
         DoPlayerFriction()
         CheckIfPlayerHasCompletedLevel()
@@ -111,8 +111,12 @@ function UpdateKeyBuffer()
         local key = tuple.key
         local did = true
 
-        if key == "space" and not Paused and (Player.standingOnObject or Player.coyote.running or (PlayerPerks["Power of the Achiever"] and not Player.doubleJumpUsed)) then -- jumping
-            Player.yvelocity = Player.yvelocity - Player.jumpStrength
+        if key == "space" and not Paused and (Player.standingOnObject or Player.coyote.running or Player.touchingBottomOfObject or (PlayerPerks["Power of the Achiever"] and not Player.doubleJumpUsed)) then -- jumping
+            if Player.touchingBottomOfObject then
+                Player.yvelocity = Player.yvelocity + Player.jumpStrength
+            else
+                Player.yvelocity = Player.yvelocity - Player.jumpStrength
+            end
 
             -- wall jump?
             if Player.coyote.running and not Player.standingOnObject and (Player.touchingSideOfObject.right or Player.touchingSideOfObject.left) then
@@ -194,6 +198,9 @@ function love.mousepressed(mx, my, button)
 
     CheckButtonsClicked(button)
 end
+function love.mousereleased()
+    ClickedWithMouse = false
+end
 
 function love.wheelmoved(_, y)
     if not Minimap.showing then return end
@@ -261,7 +268,7 @@ function DoPlayerKeyPresses()
         if love.keyboard.isDown("d") then
             Minimap.x = Minimap.x + Minimap.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
         end
-    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running then
+    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running and not Player.touchingStickyObject then
         Player.pressing.a = love.keyboard.isDown("a")
         Player.pressing.d = love.keyboard.isDown("d")
 
@@ -310,6 +317,10 @@ function DoPlayerFriction()
             Player.yvelocity = 0
         end
     end
+
+    if Player.touchingStickyObject and not Player.pressing.a and not Player.pressing.d then
+        Player.xvelocity = 0
+    end
 end
 
 function ApplyPlayerVelocities(checks)
@@ -322,7 +333,9 @@ function DoPlayerCollisions(particlesOn)
 
     Player.standingOnObject = false
     Player.standingOnIcyObject = false
+    Player.touchingStickyObject = false
     Player.touchingSideOfObject.left, Player.touchingSideOfObject.right = false, false
+    Player.touchingBottomOfObject = false
 
     for objIndex, obj in ipairs(Objects) do
         local touching = Player.x + Player.width >= obj.x and Player.y + Player.height >= obj.y and Player.x <= obj.x + obj.width and Player.y <= obj.y + obj.height
@@ -374,6 +387,8 @@ function DoPlayerCollisions(particlesOn)
             elseif closestSide == 4 then -- bottom
                 Player.yvelocity = 0
                 Player.y = obj.y + obj.height
+                Player.touchingBottomOfObject = true
+                --PlaySFX(SFX.cool, 0.1, 1)
             elseif closestSide == 1 then -- left
                 CheckAndIfSoDoPlayerSmash(objIndex)
                 if obj.impenetrable then
@@ -394,6 +409,12 @@ function DoPlayerCollisions(particlesOn)
                 end
                 Player.x = obj.x + obj.width
                 Player.touchingSideOfObject.right = true
+            end
+
+            if closestSide ~= nil then
+                if obj.type == "sticky" then
+                    Player.touchingStickyObject = true
+                end
             end
 
             obj.playerTouchingSide = closestSide
@@ -744,6 +765,10 @@ function DoObjectEffects()
                 end
             end
         end
+    end
+
+    if Player.touchingStickyObject and not Player.jumped then
+        Player.yvelocity = 0
     end
 end
 

@@ -187,7 +187,7 @@ function love.load()
     }
 
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
-    ObjectGenerationPalette = { normal = 20, icy = 9, death = 4, jump = 6 }
+    ObjectGenerationPalette = { normal = 20, icy = 9, death = 4, jump = 6, sticky = 3 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
         ["Will of the Frogman"] = 5,
@@ -198,6 +198,29 @@ function love.load()
         ["Power of the Achiever"] = 1,
         ["Wings of the Guardian Angel"] = 2,
         ["Essence of the Grasshopper"] = 3,
+    }
+
+    ObjectTypeData = {
+        normal = {
+            width = { min = 400, max = 1100 },
+            height = { min = 100, max = 300 }
+        },
+        icy = {
+            width = { min = 500, max = 1200 },
+            height = { min = 100, max = 300 }
+        },
+        death = {
+            width = { min = 400, max = 1100 },
+            height = { min = 100, max = 300 }
+        },
+        jump = {
+            width = { min = 400, max = 900 },
+            height = { min = 70, max = 200 }
+        },
+        sticky = {
+            width = { min = 100, max = 250 },
+            height = { min = 200, max = 400 }
+        },
     }
 
     Messages = {}
@@ -670,7 +693,31 @@ function love.load()
 
     GameState = "menu"
 
-    Version = "1.0"
+    ClickedWithMouse = false
+
+    Version = "1.1"
+    Changelog = Version ..
+[[
+ Changelog:
+
+    QoL & decrease in difficulty:
+    - Change: Levels get taller only every 10 levels
+    - Change: Hooligan base spawn density decreased
+    - Change: Checkpoint spawn density increased
+    - Change: Perks are now displayed at shrines
+    - Change: Less extreme zoom with Eye of the Crimson Eagle perk
+    - Change: Less extreme zoom when moving fast
+    - New: Upon collecting a shrine, you will be told what the perk does
+    - Change: Size of the level number display (top-left) increased
+
+    Hooligman cutscene (WIP):
+    - New: Hooligman cutscene
+    - New: Descending phase in levels 25 and 50
+
+    Platforms:
+    - New: Sticky platform
+    - New: Jumping off the bottom of platforms
+]]
 
     GlobalDT = 0
 end
@@ -776,7 +823,7 @@ function love.draw()
 
             DrawPausedOverlay()
         end
-    elseif GameState == "menu" or GameState == "complete" or GameState == "settings" then
+    elseif GameState == "menu" or GameState == "complete" or GameState == "settings" or GameState == "changelog" then
         love.graphics.push()
 
         local zoom = 0.2
@@ -801,7 +848,7 @@ function love.draw()
         love.graphics.pop()
 
         -- overlay
-        love.graphics.setColor(0,0,0, 0.4)
+        love.graphics.setColor(0,0,0, 0.7)
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
         if GameState == "menu" then
@@ -815,6 +862,10 @@ function love.draw()
         elseif GameState == "complete" then
             DrawTextWithBackground("Intel got what they needed. Nice job!\n" .. TimeInSecondsToStupidFuckingHumanFormat(TotalTime), love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, Fonts.big, Player.color, {0,0,0})
             DrawTextWithBackground("Hit [ESC] to return to the main menu.", love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + 300, Fonts.medium, {1,1,1}, {0,0,0})
+        elseif GameState == "changelog" then
+            love.graphics.setColor(1,1,1)
+            love.graphics.setFont(Fonts.medium)
+            love.graphics.print(Changelog, 10, 10)
         end
     end
 
@@ -882,11 +933,13 @@ function DrawObjects()
         if outsideRenderDistance and Minimap.showing then
             love.graphics.setColor(0,0,0,1)
         elseif obj.type == "icy" then
-            love.graphics.setColor(.3,1,1, 1)
+            love.graphics.setColor(.3,1,1,1)
         elseif obj.type == "death" then
-            love.graphics.setColor(1,.5,0, 1)
+            love.graphics.setColor(1,.5,0,1)
         elseif obj.type == "jump" then
-            love.graphics.setColor(0,1,0, 1)
+            love.graphics.setColor(0,1,0,1)
+        elseif obj.type == "sticky" then
+            love.graphics.setColor(.8,0,1,1)
         else
             love.graphics.setColor(1,1,1, 1)
         end
@@ -940,7 +993,9 @@ function GenerateObjects()
 
     math.randomseed(Seed)
     for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
-        local width, height = math.random(400, 1100), math.random(100, 300)
+        local objectType = lume.weightedchoice(ObjectGenerationPalette)
+
+        local width, height = math.random(ObjectTypeData[objectType].width.min, ObjectTypeData[objectType].width.max), math.random(ObjectTypeData[objectType].height.min, ObjectTypeData[objectType].height.max)
         if math.random() < .05 then
             local movingWidth = width
             width = height
@@ -949,27 +1004,8 @@ function GenerateObjects()
 
         table.insert(Objects, {
             x = math.random(Boundary.x, Boundary.x + Boundary.width), y = math.random(Boundary.y, Boundary.y + Boundary.height),
-            width = width, height = height,
+            width = width, height = height, type = objectType
         })
-    end
-
-    -- apply object clusters types
-    math.randomseed(Seed)
-    for objIndex, obj in ipairs(Objects) do
-        local objectType = lume.weightedchoice(ObjectGenerationPalette)
-        obj.type = objectType
-
-        for obj2Index, obj2 in ipairs(Objects) do
-            if obj2Index ~= objIndex and (obj2.type == nil or obj.type == "normal") and Touching(obj.x, obj.y, obj.width, obj.height, obj2.x, obj2.y, obj2.width, obj2.height) then
-                obj2.type = objectType
-            end
-        end
-    end
-
-    for _, obj in ipairs(Objects) do
-        if obj.impenetrable or obj.groundZero then
-            obj.type = "normal"
-        end
     end
 
     -- safe area
@@ -1059,7 +1095,8 @@ function NextLevel()
         if Descending.doingSo then
             Descending.doingSo = false
             Descending.music:stop()
-            Music:play()
+            if Settings.musicOn then Music:play() end
+            PlaySFX(SFX.descended, 0.5, 1)
         end
     end
 end
@@ -1917,6 +1954,11 @@ function InitialiseButtons()
     end, nil, function (self)
         return GameState == "menu"
     end)
+    NewButton("Changelog", CENTERX - width / 2, CENTERY + 270, width, 40, {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+        GameState = "changelog"
+    end, nil, function (self)
+        return GameState == "menu"
+    end)
 
     -- settings
     width = 800
@@ -1946,7 +1988,7 @@ function InitialiseButtons()
     NewButton("Back", CENTERX - width / 2, CENTERY + 300, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         GameState = "menu"
     end, nil, function (self)
-        return GameState == "settings"
+        return GameState == "settings" or GameState == "changelog"
     end)
 
     width = 400
