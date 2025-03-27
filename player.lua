@@ -792,6 +792,7 @@ function DoObjectEffects()
 
     if Player.touchingStickyObject and not Player.jumped then
         Player.yvelocity = 0
+        Player.xvelocity = 0
     end
 end
 

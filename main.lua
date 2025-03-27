@@ -52,6 +52,8 @@ function love.load()
             love.audio.newSource("assets/sfx/enemy speak6.wav", "static"),
             love.audio.newSource("assets/sfx/enemy speak7.wav", "static"),
             love.audio.newSource("assets/sfx/enemy speak8.wav", "static"),
+            love.audio.newSource("assets/sfx/enemy speak9.wav", "static"),
+            love.audio.newSource("assets/sfx/enemy speak10.wav", "static"),
         },
     }
 
@@ -80,7 +82,7 @@ function love.load()
 
     Settings = {
         musicOn = true,
-        reduceParticles = false,
+        graphics = { current = 3, max = 3 },
     }
 
     Gravity = 0.6
@@ -725,28 +727,32 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.1"
+    Version = "1.1.1"
     Changelog = Version ..
 [[
  Changelog:
 
-    QoL & decrease in difficulty:
-    - Change: Levels get taller only every 10 levels
-    - Change: Hooligan base spawn density decreased
-    - Change: Checkpoint spawn density increased
-    - Change: Perks are now displayed at shrines
-    - Change: Less extreme zoom with Eye of the Crimson Eagle perk
-    - Change: Less extreme zoom when moving fast
-    - New: Upon collecting a shrine, you will be told what the perk does
-    - Change: Size of the level number display (top-left) increased
+    Hooligans:
+    - New: More player voicelines when killing hooligans
+    - New: More hooligan speaking SFX
+    - Fixed: Occasional crash when being hit by a hooligan, killing a hooligan, or rendering a hooligan smashing into a wall
 
-    Hooligman cutscene (WIP):
-    - New: Hooligman cutscene
-    - New: Descending phase in levels 25 and 50
+    QoL:
+    - New: Graphics state setting from 1-3
+    - Removed: Reduce particles setting (functionality replicated in Graphics state setting)
+    - New: Time easing when pausing and unpausing
+
+    Tutorial:
+    - New: Graphical display of keys for movement
 
     Platforms:
-    - New: Sticky platform
-    - New: Jumping off the bottom of platforms
+    - New: SFX when sticking to and un-sticking from sticky platforms
+    - Fixed: Sliding on top and on the bottom of sticky platforms if collided with while holding [A] or [D]
+
+    Descending phases:
+    - Change: Randomisation of descension levels for variety and surprise
+    - Change: 3 descension levels across an entire run, those being ~15, ~35, and 50
+    - Change: New and spookier Hooligman dialogue SFX
 ]]
 
     TimeMultiplier = 1
@@ -801,6 +807,10 @@ function love.update(dt)
         if GameCompleteFlash < 0 then
             GameCompleteFlash = 0
         end
+    end
+
+    if Settings.graphics.current == 1 then
+        Particles = {}
     end
 end
 
@@ -1068,6 +1078,7 @@ function GenerateObjects()
     SpawnCheckpoints()
     if Dialogue.list[25].done or true then SpawnShrines() end
     SpawnEnemies()
+    GenerateBG()
 end
 
 function UpdateDangerPulseProgression()
@@ -1360,6 +1371,9 @@ function DrawDisplays()
     local x = ReverseLerp(Boundary.x, Boundary.x + Boundary.width, Player.x) * love.graphics.getWidth()
     love.graphics.setLineWidth(7)
     love.graphics.line(x, 38, x, 50)
+
+    -- performance
+    --DrawTextWithBackground(love.timer.getAverageDelta() * 1000 .. " ms", 100, love.graphics.getHeight() - 30, Fonts.normal, {1,1,1}, {0,0,0})
 end
 function DrawHeatIndicator()
     local ratio = Player.temperature.current / Player.temperature.max / 2
@@ -1502,23 +1516,25 @@ function UpdateTurrets()
 
             turret.seesPlayer = false
 
-            local speed = 0.5
-            if turret.searchingAngle < turret.objectiveSearchingAngle then
-                turret.searchingAngle = turret.searchingAngle + speed * GlobalDT
-                if turret.searchingAngle > turret.objectiveSearchingAngle then
-                    turret.searchingAngle = turret.objectiveSearchingAngle
-                end
-            elseif turret.searchingAngle > turret.objectiveSearchingAngle then
-                turret.searchingAngle = turret.searchingAngle - speed * GlobalDT
+            if Settings.graphics.current >= 2 then
+                local speed = 0.5
                 if turret.searchingAngle < turret.objectiveSearchingAngle then
-                    turret.searchingAngle = turret.objectiveSearchingAngle
-                end
-            else
-                turret.searchWait.current = turret.searchWait.current + 1 * GlobalDT
-                if turret.searchWait.current >= turret.searchWait.max then
-                    turret.objectiveSearchingAngle = math.random(-360, 360)
-                    turret.searchWait.current = 0
-                    turret.searchWait.max = math.random(100, 300)
+                    turret.searchingAngle = turret.searchingAngle + speed * GlobalDT
+                    if turret.searchingAngle > turret.objectiveSearchingAngle then
+                        turret.searchingAngle = turret.objectiveSearchingAngle
+                    end
+                elseif turret.searchingAngle > turret.objectiveSearchingAngle then
+                    turret.searchingAngle = turret.searchingAngle - speed * GlobalDT
+                    if turret.searchingAngle < turret.objectiveSearchingAngle then
+                        turret.searchingAngle = turret.objectiveSearchingAngle
+                    end
+                else
+                    turret.searchWait.current = turret.searchWait.current + 1 * GlobalDT
+                    if turret.searchWait.current >= turret.searchWait.max then
+                        turret.objectiveSearchingAngle = math.random(-360, 360)
+                        turret.searchWait.current = 0
+                        turret.searchWait.max = math.random(100, 300)
+                    end
                 end
             end
         end
@@ -1882,6 +1898,9 @@ function DrawBG()
     end
 end
 function GenerateBG()
+    if Settings.graphics.current == 1 then return end
+
+    BG = {}
     for _ = 1, Boundary.width * Boundary.height * ObjectGlobalData.objectDensity do
         table.insert(BG,
         { x = math.random(Boundary.x, Boundary.x + Boundary.width), y = math.random(Boundary.y, Boundary.y + Boundary.height), radius = math.random() * 100 + 30, alpha = math.random() / 8 })
@@ -2019,7 +2038,7 @@ function InitialiseButtons()
 
     -- settings
     width = 800
-    NewButton("Music: ", CENTERX - width / 2, CENTERY - 200, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("", CENTERX - width / 2, CENTERY - 200, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         Settings.musicOn = not Settings.musicOn
         SaveData()
 
@@ -2031,13 +2050,18 @@ function InitialiseButtons()
     end, function (self)
         return GameState == "settings"
     end)
-    NewButton("Reduce particles: ", CENTERX - width / 2, CENTERY - 100, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
-        Settings.reduceParticles = not Settings.reduceParticles
+    NewButton("", CENTERX - width / 2, CENTERY - 100, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+        Settings.graphics.current = Settings.graphics.current + 1
+        if Settings.graphics.current > Settings.graphics.max then Settings.graphics.current = 1 end
+        if Settings.graphics.current >= 2 then
+            GenerateBG()
+        else
+            BG = {}
+        end
+
         SaveData()
     end, function (self)
-        self.text = "Reduce Particles: " .. (Settings.reduceParticles and "On" or "Off")
-        self.textColor = (Settings.reduceParticles and {0,1,0} or {1,0,0})
-        self.lineColor = self.textColor
+        self.text = "Graphics: " .. Settings.graphics.current .. " / " .. Settings.graphics.max
     end, function (self)
         return GameState == "settings"
     end)

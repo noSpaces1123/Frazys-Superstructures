@@ -8,7 +8,7 @@ function NewParticle(x, y, radius, color, speed, degrees, gravity, lifespan, beh
             love.graphics.circle("fill", self.x, self.y, self.radius)
         end,
         update = function (self)
-            self.lifespan = self.lifespan - (1 + (Settings.reduceParticles and 2 or 0)) * GlobalDT
+            self.lifespan = self.lifespan - (1 + (Settings.graphics.current == 2 and 2 or 0)) * GlobalDT
             if self.lifespan <= 0 then
                 lume.remove(Particles, self)
             end
