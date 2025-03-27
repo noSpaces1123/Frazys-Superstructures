@@ -17,85 +17,89 @@ end
 
 function DrawEnemies()
     for _, enemy in ipairs(Enemies) do
-        love.graphics.setColor(1,0,0)
-        love.graphics.rectangle("fill", enemy.x, enemy.y, enemy.width, enemy.width)
+        if not enemy.dead then
+            love.graphics.setColor(1,0,0)
+            love.graphics.rectangle("fill", enemy.x, enemy.y, enemy.width, enemy.width)
 
-        if enemy.seesPlayer and not Player.respawnWait.dead then
-            love.graphics.setColor(1,0,0,math.random()/2)
-            love.graphics.setLineWidth(3)
-            love.graphics.line(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+            if enemy.seesPlayer and not Player.respawnWait.dead then
+                love.graphics.setColor(1,0,0,math.random()/2)
+                love.graphics.setLineWidth(3)
+                love.graphics.line(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+            end
+
+
+            local multiply = enemy.width / 6
+            local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+            local eyeX, eyeY = enemy.x + enemy.width / 2 + math.sin(angle) * multiply, enemy.y + enemy.width / 2 + math.cos(angle) * multiply
+            local eyeWidth = enemy.width * 0.5
+
+            if not enemy.seesPlayer then
+                eyeX, eyeY = enemy.x + enemy.width / 2, enemy.y + enemy.width / 2
+            end
+
+            love.graphics.setColor(0,0,0)
+            love.graphics.rectangle("fill", eyeX - eyeWidth / 2, eyeY - eyeWidth / 2, eyeWidth, eyeWidth)
         end
-
-
-        local multiply = enemy.width / 6
-        local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
-        local eyeX, eyeY = enemy.x + enemy.width / 2 + math.sin(angle) * multiply, enemy.y + enemy.width / 2 + math.cos(angle) * multiply
-        local eyeWidth = enemy.width * 0.5
-
-        if not enemy.seesPlayer then
-            eyeX, eyeY = enemy.x + enemy.width / 2, enemy.y + enemy.width / 2
-        end
-
-        love.graphics.setColor(0,0,0)
-        love.graphics.rectangle("fill", eyeX - eyeWidth / 2, eyeY - eyeWidth / 2, eyeWidth, eyeWidth)
     end
 end
 
 function UpdateEnemies()
     for index, enemy in ipairs(Enemies) do
-        local distance = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+        if not enemy.dead then
+            local distance = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
 
-        local before = enemy.seesPlayer
-        enemy.seesPlayer = distance <= enemy.viewRadius
-        if enemy.seesPlayer and not before then
-            local ratio = 1 - (enemy.width - EnemyGlobalData.width.min) / (EnemyGlobalData.width.max - EnemyGlobalData.width.min)
-            PlaySFX(SFX.enemySeesPlayer, 0.6, ratio * 1 + 1)
-            if math.random() < 0.2 then
-                enemy.warble.current = enemy.warble.max
-            end
-        end
-
-        if distance <= Player.renderDistance then
-            if not Player.respawnWait.dead and not NextLevelAnimation.running then
-                if enemy.seesPlayer then
-                    local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2) + math.rad(Jitter(20))
-                    enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * GlobalDT
-                    enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * GlobalDT
+            local before = enemy.seesPlayer
+            enemy.seesPlayer = distance <= enemy.viewRadius
+            if enemy.seesPlayer and not before then
+                local ratio = 1 - (enemy.width - EnemyGlobalData.width.min) / (EnemyGlobalData.width.max - EnemyGlobalData.width.min)
+                PlaySFX(SFX.enemySeesPlayer, 0.6, ratio * 1 + 1)
+                if math.random() < 0.2 then
+                    enemy.warble.current = enemy.warble.max
                 end
+            end
 
-                if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
-                    if Player.netSpeed + Player.enemyKillForgiveness >= Pythag(enemy.xvelocity, enemy.yvelocity) then
-                        ExplodeEnemy(enemy)
-                        PlayDialogue(math.random(#Dialogue.eventual.killEnemy), "killEnemy")
-                        PlayerSkill.enemiesKilled = PlayerSkill.enemiesKilled + 1
-                    else
-                        KillPlayer()
-                        enemy.warble.current = enemy.warble.max
-                        NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 200, Fonts.medium, index)
+            if distance <= Player.renderDistance then
+                if not Player.respawnWait.dead and not NextLevelAnimation.running then
+                    if enemy.seesPlayer then
+                        local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2) + math.rad(Jitter(20))
+                        enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * GlobalDT
+                        enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * GlobalDT
+                    end
+
+                    if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
+                        if Player.netSpeed + Player.enemyKillForgiveness >= Pythag(enemy.xvelocity, enemy.yvelocity) then
+                            ExplodeEnemy(enemy)
+                            PlayDialogue(math.random(#Dialogue.eventual.killEnemy), "killEnemy")
+                            PlayerSkill.enemiesKilled = PlayerSkill.enemiesKilled + 1
+                        else
+                            KillPlayer()
+                            enemy.warble.current = enemy.warble.max
+                            NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 200, Fonts.medium, index)
+                        end
                     end
                 end
-            end
 
-            if enemy.xvelocity ~= 0 or enemy.yvelocity ~= 0 then
-                table.insert(Particles,
-                NewParticle(math.random(enemy.x + enemy.width / 4, enemy.x + enemy.width - enemy.width / 4), math.random(enemy.y + enemy.width / 4, enemy.y + enemy.width - enemy.width / 4), 4, {1,0,0,0.4}, 0, 0, 0, 50))
-            end
+                if enemy.xvelocity ~= 0 or enemy.yvelocity ~= 0 then
+                    table.insert(Particles,
+                    NewParticle(math.random(enemy.x + enemy.width / 4, enemy.x + enemy.width - enemy.width / 4), math.random(enemy.y + enemy.width / 4, enemy.y + enemy.width - enemy.width / 4), 4, {1,0,0,0.4}, 0, 0, 0, 30))
+                end
 
-            DoEnemyFriction(index)
-            DoEnemyCollisions(index)
+                DoEnemyFriction(index)
+                DoEnemyCollisions(index)
 
-            enemy.x = enemy.x + enemy.xvelocity * GlobalDT
-            enemy.y = enemy.y + enemy.yvelocity * GlobalDT
+                enemy.x = enemy.x + enemy.xvelocity * GlobalDT
+                enemy.y = enemy.y + enemy.yvelocity * GlobalDT
 
-            -- warbling
-            local maxWarbleHearing = 2000
-            if enemy.warble == nil then enemy.warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) } end
-            enemy.warble.current = enemy.warble.current + 1
-            if enemy.warble.current >= enemy.warble.max then
-                enemy.warble.current = 0
-                enemy.warble.max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max)
-                PlaySFX(lume.randomchoice(SFX.enemySpeak), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
-                NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 100, Fonts.medium, index)
+                -- warbling
+                local maxWarbleHearing = 2000
+                if enemy.warble == nil then enemy.warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) } end
+                enemy.warble.current = enemy.warble.current + 1
+                if enemy.warble.current >= enemy.warble.max then
+                    enemy.warble.current = 0
+                    enemy.warble.max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max)
+                    PlaySFX(lume.randomchoice(SFX.enemySpeak), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
+                    NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 100, Fonts.medium, index)
+                end
             end
         end
     end
@@ -217,6 +221,11 @@ function ExplodeEnemy(enemy)
         end
     end
 
-    lume.remove(Enemies, enemy)
+    for _, e in ipairs(Enemies) do
+        if e == enemy then
+            e.dead = true
+            break
+        end
+    end
     PlaySFX(SFX.smash, 0.5, 1.5)
 end

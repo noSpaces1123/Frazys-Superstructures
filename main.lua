@@ -37,6 +37,8 @@ function love.load()
         resetRun = love.audio.newSource("assets/sfx/reset run.wav", "static"),
         zoom = love.audio.newSource("assets/sfx/zoom.wav", "static"),
         descended = love.audio.newSource("assets/sfx/descended.wav", "static"),
+        stick = love.audio.newSource("assets/sfx/stick.wav", "static"),
+        unstick = love.audio.newSource("assets/sfx/unstick.wav", "static"),
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
@@ -371,7 +373,7 @@ function love.load()
                 end
             },
             {
-                text = "Intel said I've got a special ability I can use with [Q], as long as I have enough charge in the top left.",
+                text = "Intel said I've got a special ability I can use with [Q], as long as I have enough charge in the top left bar. A fixed amount is removed from the bar with every use.",
                 when = function ()
                     return Level == 5
                 end
@@ -628,6 +630,12 @@ function love.load()
                 text = "All the intel collected in under an hour and a half! But I bet I can do it faster.",
                 when = function ()
                     return BestGameCompletionTime ~= nil and BestGameCompletionTime < 90 * 60
+                end
+            },
+            {
+                text = "([P] to pause)",
+                when = function ()
+                    return Level == 1 and Player.y <= Boundary.y + Boundary.height / 2
                 end
             },
         },
@@ -1962,7 +1970,7 @@ function DrawPausedOverlay()
 
         local generalPadding = 10
         local scale = 0.6
-        love.graphics.draw(Sprites.fullControls, love.graphics.getWidth() - generalPadding - Sprites.controls:getWidth() * scale, love.graphics.getHeight() - generalPadding - Sprites.controls:getHeight() * scale, 0, scale,scale)
+        love.graphics.draw(Sprites.fullControls, love.graphics.getWidth() - generalPadding - Sprites.fullControls:getWidth() * scale, love.graphics.getHeight() - generalPadding - Sprites.controls:getHeight() * scale, 0, scale,scale)
     end
 end
 

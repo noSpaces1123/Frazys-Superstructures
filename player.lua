@@ -345,6 +345,7 @@ end
 
 function DoPlayerCollisions(particlesOn)
     local wasStandingOnObject = Player.standingOnObject
+    local wasTouchingStickyObject = Player.touchingStickyObject
 
     Player.standingOnObject = false
     Player.standingOnIcyObject = false
@@ -382,6 +383,8 @@ function DoPlayerCollisions(particlesOn)
 
                 if obj.type == "icy" and Player.temperature.current > Player.temperature.max / 3 then
                     PlaySFX(SFX.cool, 0.1, 2)
+                elseif obj.type == "sticky" then
+                    PlaySFX(SFX.stick, 0.2, math.random() / 10 + 0.95)
                 end
 
                 if PlayerPerks["Power of the Achiever"] then
@@ -446,6 +449,11 @@ function DoPlayerCollisions(particlesOn)
     -- coyote time
     if wasStandingOnObject and not Player.standingOnObject and Player.yvelocity >= 0 then
         StartPlayerCoyote()
+    end
+
+    -- unstick soundalound
+    if wasTouchingStickyObject and not Player.touchingStickyObject then
+        PlaySFX(SFX.unstick, 0.1, math.random()/10 + .95)
     end
 end
 
