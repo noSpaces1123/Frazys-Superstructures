@@ -36,7 +36,7 @@ function LoadData()
     BestGameCompletionTime = (data.bestGameCompletionTime and data.bestGameCompletionTime or nil)
     DeathPositions = (data.deathPositions and data.deathPositions or {})
     Enemies = (data.enemies and data.enemies or {})
-    Descending.onLevels = data.descensionLevels
+    Descending.onLevels = (data.descensionLevels and data.descensionLevels or PickDescensionLevels())
 
     if data.playerPerks then
         PlayerPerks = data.playerPerks

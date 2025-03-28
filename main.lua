@@ -727,32 +727,13 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.1.1"
+    Version = "1.1.2"
     Changelog = Version ..
 [[
  Changelog:
 
-    Hooligans:
-    - New: More player voicelines when killing hooligans
-    - New: More hooligan speaking SFX
-    - Fixed: Occasional crash when being hit by a hooligan, killing a hooligan, or rendering a hooligan smashing into a wall
-
-    QoL:
-    - New: Graphics state setting from 1-3
-    - Removed: Reduce particles setting (functionality replicated in Graphics state setting)
-    - New: Time easing when pausing and unpausing
-
-    Tutorial:
-    - New: Graphical display of keys for movement
-
-    Platforms:
-    - New: SFX when sticking to and un-sticking from sticky platforms
-    - Fixed: Sliding on top and on the bottom of sticky platforms if collided with while holding [A] or [D]
-
-    Descending phases:
-    - Change: Randomisation of descension levels for variety and surprise
-    - Change: 3 descension levels across an entire run, those being ~15, ~35, and 50
-    - Change: New and spookier Hooligman dialogue SFX
+    Bug fixes:
+    - Fixed: Crash when trying to load levels to descend on from data, of which the levels to descend on data did not exist (1204)
 ]]
 
     TimeMultiplier = 1
