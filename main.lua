@@ -976,7 +976,7 @@ function DrawObjects()
     end
     for _, obj in ipairs(Objects) do
         local outsideRenderDistance = Distance(obj.x + obj.width / 2, obj.y + obj.height / 2, Player.x, Player.y) > Player.renderDistance
-        if not obj.discovered then goto continue end
+        if not obj.discovered and GameState == "game" then goto continue end
         if outsideRenderDistance and not obj.discovered and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
         if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
 
