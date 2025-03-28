@@ -1260,6 +1260,10 @@ function SetUpDescension()
     SaveData()
     table.remove(Objects, 1)
     Descending.music:play()
+    Player.yvelocity = 0
+
+    local width = 800
+    table.insert(Objects, 1, { x = Player.x - width / 2, y = Player.y + Player.width + 20, width = width, height = 70, type = "normal" })
 end
 function UpdateHooligmanDialogue()
     if Descending.hooligmanCutscene.dialogue.running then
