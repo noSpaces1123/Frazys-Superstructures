@@ -1690,7 +1690,14 @@ end
 function SpawnCheckpoints()
     Checkpoints = {}
     for _ = 1, ObjectGlobalData.checkpointDensity * Boundary.width * Boundary.height do
-        NewCheckpoint(math.random(Boundary.x, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height))
+        local x, y = math.random(Boundary.x, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height)
+        NewCheckpoint(x, y)
+
+        for _, obj in ipairs(Objects) do
+            if Touching(x, y, 0, 0, obj.x, obj.y, obj.width, obj.height) then
+                lume.remove(Objects, obj)
+            end
+        end
     end
 end
 function NewCheckpoint(x, y)
