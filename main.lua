@@ -261,7 +261,12 @@ function love.load()
             },
             hooligman = {
                 width = 1000,
-            }
+            },
+        },
+        enemyDensity = {
+            0.0000015,
+            0.000002,
+            0.0000025,
         },
     }
     Descending.music:setLooping(true)
@@ -637,7 +642,7 @@ function love.load()
             {
                 text = "([P] to pause)",
                 when = function ()
-                    return Level == 1 and Player.y <= Boundary.y + Boundary.height / 2
+                    return Level == 1 and Player.y <= Boundary.y + Boundary.height / 2 and not Dialogue.playing.running
                 end
             },
         },
@@ -769,6 +774,7 @@ function love.update(dt)
                 UpdateMessages()
                 UpdateEnemies()
                 UpdateDialogue()
+                DiscoverObjects()
             end
 
             UpdateHooligmanCutscene()
@@ -962,10 +968,11 @@ function DrawObjects()
     end
     for _, obj in ipairs(Objects) do
         local outsideRenderDistance = Distance(obj.x + obj.width / 2, obj.y + obj.height / 2, Player.x, Player.y) > Player.renderDistance
-        if outsideRenderDistance and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
+        if not obj.discovered then goto continue end
+        if outsideRenderDistance and not obj.discovered and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
         if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
 
-        if outsideRenderDistance and Minimap.showing then
+        if outsideRenderDistance and Minimap.showing and not obj.discovered then
             love.graphics.setColor(0,0,0,1)
         elseif obj.type == "icy" then
             love.graphics.setColor(.3,1,1,1)
@@ -981,10 +988,10 @@ function DrawObjects()
         love.graphics.rectangle("fill", obj.x, obj.y, obj.width, obj.height, ObjectGlobalData.cornerRadius, ObjectGlobalData.cornerRadius)
 
         if obj.dangerPulse then
-            local ratioUWU = ObjectGlobalData.dangerPulseProgression.current / ObjectGlobalData.dangerPulseProgression.max
-            local alpha = ratioUWU
+            local uwu = ObjectGlobalData.dangerPulseProgression.current / ObjectGlobalData.dangerPulseProgression.max -- ratio haha
+            local alpha = uwu
             love.graphics.setColor(1, 0, 0, alpha)
-            love.graphics.rectangle("fill", obj.x, obj.y + (1 - ratioUWU) * obj.height, obj.width, ratioUWU * obj.height, ObjectGlobalData.cornerRadius, ObjectGlobalData.cornerRadius)
+            love.graphics.rectangle("fill", obj.x, obj.y + (1 - uwu) * obj.height, obj.width, uwu * obj.height, ObjectGlobalData.cornerRadius, ObjectGlobalData.cornerRadius)
 
             love.graphics.setLineWidth(2)
             love.graphics.rectangle("line", obj.x, obj.y, obj.width, obj.height, ObjectGlobalData.cornerRadius, ObjectGlobalData.cornerRadius)
@@ -1060,6 +1067,23 @@ function GenerateObjects()
     if Dialogue.list[25].done or true then SpawnShrines() end
     SpawnEnemies()
     GenerateBG()
+end
+function DiscoverObjects()
+    for _, obj in ipairs(Objects) do
+        love.graphics.push()
+        InitialiseRegularCoordinateAlterations()
+        local objX, objY = love.graphics.transformPoint(obj.x, obj.y)
+        love.graphics.pop()
+
+        love.graphics.push()
+        if love.keyboard.isDown("lshift") then ApplyCamLookAhead() end
+        local screenX, screenY = love.graphics.inverseTransformPoint(0, 0)
+        love.graphics.pop()
+
+        if Touching(objX, objY, obj.width, obj.height, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
+            obj.discovered = true
+        end
+    end
 end
 
 function UpdateDangerPulseProgression()
@@ -1209,16 +1233,8 @@ function UpdateHooligmanCutscene()
         end
 
         if Descending.hooligmanCutscene.dialogue.displayedAll then
-            Descending.doingSo = true
             Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.max - 1
-
-            Turrets, Enemies = {}, {}
-            EnemyGlobalData.enemyDensity = 0.0000015
-            Player.checkpoint.x, Player.checkpoint.y = nil, nil
-            SpawnEnemies()
-            SaveData()
-            table.remove(Objects, 1)
-            Descending.music:play()
+            SetUpDescension()
         end
     elseif Descending.doingSo and Descending.hooligmanCutscene.intro.current > 0 then
         Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.current - 1 * GlobalDT
@@ -1228,6 +1244,22 @@ function UpdateHooligmanCutscene()
     else
         Descending.hooligmanCutscene.intro.current = Descending.hooligmanCutscene.intro.current + 1 * GlobalDT
     end
+end
+function SetUpDescension()
+    local i
+    for index, lvl in ipairs(Descending.onLevels) do
+        if lvl == Level then i = index end
+    end
+
+    EnemyGlobalData.enemyDensity = Descending.enemyDensity[i]
+
+    Descending.doingSo = true
+    Turrets, Enemies = {}, {}
+    Player.checkpoint.x, Player.checkpoint.y = nil, nil
+    SpawnEnemies()
+    SaveData()
+    table.remove(Objects, 1)
+    Descending.music:play()
 end
 function UpdateHooligmanDialogue()
     if Descending.hooligmanCutscene.dialogue.running then
