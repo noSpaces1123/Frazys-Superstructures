@@ -230,7 +230,7 @@ function love.wheelmoved(_, y)
 end
 
 function love.focus(focus)
-    if not focus then
+    if not focus and GameState == "game" then
         Paused = true
     end
 end

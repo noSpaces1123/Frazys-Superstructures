@@ -660,6 +660,7 @@ function love.load()
                 "Hole in one.",
                 "Who's the man?",
                 "No mercy.",
+                "What's it to ya?",
             },
         },
     }
