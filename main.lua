@@ -732,13 +732,21 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.1.2"
+    Version = "1.1.3"
     Changelog = Version ..
 [[
  Changelog:
 
+    Map discovery:
+    - New: Added map discovery (only objects for now)
+
+    Hooligman encounters:
+    - Change: Removed upwards velocity after Hooligman cutscenes
+    - New: Hooligan density increases with every descension level
+    - New: Platform spawns below player when starting a descension level
+
     Bug fixes:
-    - Fixed: Crash when trying to load levels to descend on from data, of which the levels to descend on data did not exist (1204)
+    - Fixed: Checkpoints inaccessible inside other platforms
 ]]
 
     TimeMultiplier = 1
