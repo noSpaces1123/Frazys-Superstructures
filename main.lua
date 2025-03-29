@@ -875,7 +875,7 @@ function love.draw()
 
             DrawHeatIndicator()
 
-            if PickingUpgrade then
+            if UpgradeData.picking then
                 DrawUpgradeMenuOverlay()
             else
                 DrawPausedOverlay()
@@ -2164,8 +2164,6 @@ function UpdateSlowMo()
 end
 
 function InitialiseUpgrades()
-    PickingUpgrade = false
-
     AnalyticsUpgrades = {
         ["level height display"] = false,
     }
@@ -2174,6 +2172,7 @@ function InitialiseUpgrades()
         jumpHeightIncrement = 2,
         speedIncrement = 0.06,
         spacingOnMenu = 700,
+        picking = false, picked = false,
     }
 
     Upgrades = {
@@ -2199,6 +2198,28 @@ function InitialiseUpgrades()
     for key, _ in pairs(AnalyticsUpgrades) do
         table.insert(Upgrades["analytics"], key)
     end
+
+    local width = 600
+    for index = 1, 3 do
+        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2) + 100, width, 50, {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1},
+        Fonts.medium, 4, 10, 10, function (self)
+            local listOfCategories = {}
+            for key, _ in pairs(Upgrades) do
+                table.insert(listOfCategories, key)
+            end
+
+            PlayerUpgrades[listOfCategories[index]] = PlayerUpgrades[listOfCategories[index]] + 1
+            SaveData()
+        end, nil, function (self)
+            return UpgradeData.picking and not UpgradeData.picked
+        end)
+    end
+
+    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 200, width, 80, {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.medium, 4, 10, 10, function (self)
+        UpgradeData.picked, UpgradeData.picking = false, false
+    end, nil, function ()
+        return UpgradeData.picked
+    end)
 end
 function ApplyUpgrades()
     Player.jumpStrength = Player.baseJumpStrength + PlayerUpgrades["jump height"] * UpgradeData.jumpHeightIncrement
