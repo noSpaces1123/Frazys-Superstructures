@@ -39,6 +39,7 @@ function love.load()
         descended = love.audio.newSource("assets/sfx/descended.wav", "static"),
         stick = love.audio.newSource("assets/sfx/stick.wav", "static"),
         unstick = love.audio.newSource("assets/sfx/unstick.wav", "static"),
+        upgrade = love.audio.newSource("assets/sfx/upgrade.wav", "static"),
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
@@ -670,6 +671,9 @@ function love.load()
 
     Enemies = {}
 
+    Buttons = {}
+    InitialiseButtons()
+
     InitialiseUpgrades()
 
     if love.filesystem.getInfo("data.csv") then
@@ -721,9 +725,6 @@ function love.load()
 
     GameCompleteFlash = 0
 
-    Buttons = {}
-    InitialiseButtons()
-
     Paused = false
 
     KeyBuffer = {}
@@ -767,40 +768,43 @@ function love.update(dt)
 
     UpdateSlowMo()
 
-    if GameState == "game" then
-        UpdatePlayer()
-        UpdateShakeIntensity()
-        UpdateDangerPulseProgression()
-        UpdateCamLookAhead()
-        ExtendView()
+    if not UpgradeData.picking then
+        if GameState == "game" then
+            UpdatePlayer()
+            UpdateShakeIntensity()
+            UpdateDangerPulseProgression()
+            UpdateCamLookAhead()
+            ExtendView()
 
-        UpdateNextLevelAnimation()
+            UpdateNextLevelAnimation()
 
-        if not Paused then
-            TimeOnThisLevel = TimeOnThisLevel + dt
+            if not Paused then
+                TimeOnThisLevel = TimeOnThisLevel + dt
 
-            if not Descending.hooligmanCutscene.running then
-                UpdateParticles()
-                UpdateTurrets()
-                UpdateBullets()
-                UpdateShrines()
-                UpdateMessages()
-                UpdateEnemies()
-                UpdateDialogue()
-                DiscoverObjects()
+                if not Descending.hooligmanCutscene.running then
+                    UpdateParticles()
+                    UpdateTurrets()
+                    UpdateBullets()
+                    UpdateShrines()
+                    UpdateMessages()
+                    UpdateEnemies()
+                    UpdateDialogue()
+                    DiscoverObjects()
+                end
+
+                UpdateHooligmanCutscene()
+                UpdateHooligmanDialogue()
             end
 
-            UpdateHooligmanCutscene()
-            UpdateHooligmanDialogue()
+            --CheckForOddities()
+
+            UpdateSaveInterval()
+        else
+            UpdateTurrets()
         end
-
-        --CheckForOddities()
-
-        UpdateSaveInterval()
-    else
-        UpdateTurrets()
-        UpdateButtons()
     end
+
+    UpdateButtons()
 
     if GameCompleteFlash > 0 then
         GameCompleteFlash = GameCompleteFlash - 0.005 * GlobalDT
@@ -1199,7 +1203,7 @@ function UpdateNextLevelAnimation()
         MessageWithPlayerStats()
         SaveData()
 
-        PlaySFX(SFX.playerSpawn, 0.5, 1)
+        OpenUpgradeMenu()
     end
 end
 function ApplyNextLevelAnimation()
@@ -1395,14 +1399,25 @@ function DrawDisplays()
     -- distance to goal, temperature
     love.graphics.setColor(0,1,0)
     love.graphics.setFont(Fonts.normal)
-    love.graphics.printf(
-        math.floor(ToMeters(math.abs(Player.y))) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) .. " m" or "nil") .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%",
-        0, generalPadding, love.graphics.getWidth() - generalPadding * 2, "center")
+
+    local text = ""
+    if AnalyticsUpgrades[1].on then
+        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " m / " .. ToMeters(Boundary.height)
+    end
+    if AnalyticsUpgrades[2].on then
+        text = text .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
+    end
+    if AnalyticsUpgrades[3].on then
+        text = text .. " | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil")
+    end
+
+    love.graphics.printf(text, 0, generalPadding, love.graphics.getWidth() - generalPadding * 2, "center")
 
     -- x location on map
     local x = ReverseLerp(Boundary.x, Boundary.x + Boundary.width, Player.x) * love.graphics.getWidth()
     love.graphics.setLineWidth(7)
-    love.graphics.line(x, 38, x, 50)
+    love.graphics.setColor(0,1,0,.3)
+    love.graphics.line(x, 10, x, 24)
 
     -- performance
     --DrawTextWithBackground(love.timer.getAverageDelta() * 1000 .. " ms", 100, love.graphics.getHeight() - 30, Fonts.normal, {1,1,1}, {0,0,0})
@@ -1804,7 +1819,7 @@ function DrawShines()
 
         ::continue::
 
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
+        if AnalyticsUpgrades[6].on and Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
             DrawArrowTowards(shrine.x, shrine.y, color, 1, ShrineGlobalData.maxHintDistance)
         end
     end
@@ -2114,7 +2129,7 @@ function InitialiseButtons()
         return GameState == "settings" or GameState == "changelog"
     end)
 
-    width = 400
+    width = 500
     NewButton("Reset Current Run", CENTERX - width / 2, CENTERY + 400, width, 60, {1,0,0}, {0,0,0}, {.1,.1,.1}, {1,0,0}, Fonts.medium, 2, 10,10, function (self)
         if not self.confirmation then
             self.confirmation = 0
@@ -2122,11 +2137,11 @@ function InitialiseButtons()
         elseif self.confirmation == 0 and love.keyboard.isDown("lshift") then
             self.confirmation = self.confirmation + 1
             self.key = lume.randomchoice({"u","i","o","p","k","l"})
-            self.text = "Hold Shift & " .. string.upper(self.key) .. " to confirm."
+            self.text = "Hold shift, " .. string.upper(self.key) .. ", and click to confirm."
         elseif self.confirmation == 1 and love.keyboard.isDown("lshift") and love.keyboard.isDown(self.key) then
             self.confirmation = nil
             self.text = "Reset Current Run"
-            PlaySFX(SFX.resetRun, 0.5, 1)
+            PlaySFX(SFX.resetRun, 0.1, 1)
             ResetGame()
         end
     end, nil, function (self)
@@ -2164,59 +2179,91 @@ function UpdateSlowMo()
 end
 
 function InitialiseUpgrades()
-    AnalyticsUpgrades = {
-        ["level height display"] = false,
-    }
+    AnalyticsUpgrades = {}
 
     UpgradeData = {
         jumpHeightIncrement = 2,
-        speedIncrement = 0.06,
-        spacingOnMenu = 700,
+        speedIncrement = 0.04,
+        spacingOnMenu = 200,
         picking = false, picked = false,
     }
 
     Upgrades = {
-        ["jump height"] = {
-            "hop",
-            "hop higher",
-            "leap",
-            "leap higher",
-            "fly",
-            "fly higher",
+        {
+            name = "jump height",
+            list = {
+                "hop",
+                "hop higher",
+                "leap",
+                "leap higher",
+                "fly",
+                "fly higher",
+            }
         },
-        ["speed"] = {
-            "run",
-            "run faster",
-            "sprint",
-            "sprint faster",
-            "drive",
-            "drive faster",
+        {
+            name = "speed",
+            list = {
+                "run",
+                "run faster",
+                "sprint",
+                "sprint faster",
+                "drive",
+                "drive faster",
+            }
         },
-        ["analytics"] = {},
+        {
+            name = "analytics",
+            list = {
+                "level height display",
+                "temperature display",
+                "checkpoint display",
+                "minimap",
+                "waypoints",
+                "signal radar",
+            }
+        },
     }
 
-    for key, _ in pairs(AnalyticsUpgrades) do
-        table.insert(Upgrades["analytics"], key)
+    for index, value in ipairs(Upgrades[3].list) do
+        AnalyticsUpgrades[index] = { name = value, on = false }
     end
 
-    local width = 600
+    local width = 400
     for index = 1, 3 do
-        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2) + 100, width, 50, {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1},
-        Fonts.medium, 4, 10, 10, function (self)
+        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2) + 50, width, 40, {0,0,0}, {0,0,0}, {.2,.2,.2}, {1,1,1},
+        Fonts.normal, 0, 10, 10, function (self)
             local listOfCategories = {}
-            for key, _ in pairs(Upgrades) do
-                table.insert(listOfCategories, key)
+            for _, value in ipairs(Upgrades) do
+                table.insert(listOfCategories, value.name)
             end
 
             PlayerUpgrades[listOfCategories[index]] = PlayerUpgrades[listOfCategories[index]] + 1
+            UpgradeData.picked = true
+
+            ApplyUpgrades()
             SaveData()
-        end, nil, function (self)
-            return UpgradeData.picking and not UpgradeData.picked
+
+            PlaySFX(SFX.upgrade, 0.4, 1)
+        end, function (self)
+            if UpgradeData.picked then
+                self.textColor = {.3,.3,.3}
+                self.mouseOverFillColor = self.fillColor
+                self.lineColor = self.textColor
+                self.grayedOut = true
+            else
+                self.textColor = {1,1,1}
+                self.mouseOverFillColor = {.2,.2,.2}
+                self.lineColor = {.2,.2,.2}
+                self.grayedOut = false
+            end
+        end, function (self)
+            return UpgradeData.picking
         end)
     end
 
-    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 200, width, 80, {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.medium, 4, 10, 10, function (self)
+    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 80, width, 40, {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.medium, 4, 10, 10, function (self)
         UpgradeData.picked, UpgradeData.picking = false, false
+        PlaySFX(SFX.playerSpawn, 0.5, 1)
     end, nil, function ()
         return UpgradeData.picked
     end)
@@ -2226,20 +2273,25 @@ function ApplyUpgrades()
     Player.speed = Player.baseSpeed + PlayerUpgrades["speed"] * UpgradeData.speedIncrement
 
     for i = 1, PlayerUpgrades["analytics"] do
-        AnalyticsUpgrades[Upgrades["analytics"][i]] = true
+        AnalyticsUpgrades[i].on = true
     end
 end
+function OpenUpgradeMenu()
+    UpgradeData.picking = true
+end
 function DrawUpgradeMenuOverlay()
-    love.graphics.setColor(0,0,0, 0.2)
+    love.graphics.setColor(0,0,0, 0.5)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
     local listOfCategories = {}
-    for key, _ in pairs(Upgrades) do
-        table.insert(listOfCategories, key)
+    for _, value in ipairs(Upgrades) do
+        table.insert(listOfCategories, value.name)
     end
 
     for index = 1, 3 do
-        DrawTextWithBackground(string.upper(Upgrades[listOfCategories[index]]) .. ":" .. string.upper(Upgrades[listOfCategories[index]][PlayerUpgrades[listOfCategories[index]]]),
-        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2), Fonts.medium, {1,1,1}, {0,0,0})
+        local category = Upgrades[index].name
+        local level = Upgrades[index].list[PlayerUpgrades[category]]
+        DrawTextWithBackground(string.upper(category) .. ": " .. string.upper((level and level .. " unlocked" or "not upgraded")),
+        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2), Fonts.medium, (level and {1,1,1} or {1,0,0}), {0,0,0})
     end
 end

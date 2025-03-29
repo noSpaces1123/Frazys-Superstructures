@@ -2,7 +2,7 @@ function LoadPlayer()
     Player = {
         x = 0, y = Boundary.y + Boundary.height,
         width = 10, height = 10, color = { 0,1,1 }, zoom = 0.4,
-        baseSpeed = 0.4, speed = nil, netSpeed = 0, baseJumpStrength = 23, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
+        baseSpeed = 0.35, speed = nil, netSpeed = 0, baseJumpStrength = 20, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
         standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false }, touchingStickyObject = false, touchingBottomOfObject = false,
         coyote = { current = 0, max = 10, running = false },
@@ -55,8 +55,8 @@ function ResetPlayerData()
     end
 
     PlayerUpgrades = {}
-    for key, _ in pairs(Upgrades) do
-        PlayerUpgrades[key] = 0
+    for _, value in pairs(Upgrades) do
+        PlayerUpgrades[value.name] = 0
     end
 end
 function ResetGame()
@@ -154,7 +154,7 @@ function UpdateKeyBuffer()
             SaveData()
         elseif key == "q" and not Paused and GameState == "game" then
             DoPlayerSuperJump()
-        elseif key == "m" and GameState == "game" then
+        elseif key == "m" and GameState == "game" and AnalyticsUpgrades[4].on then
             ToggleMinimap()
         elseif key == "p" and not Minimap.showing and GameState == "game" then
             if Paused then
@@ -187,7 +187,7 @@ end
 
 function love.mousepressed(mx, my, button)
     if GameState == "game" then
-        if button == 1 and Minimap.showing then
+        if button == 1 and Minimap.showing and AnalyticsUpgrades[5].on then
             love.graphics.push()
 
             InitialiseMinimapCoordinateAlterations()

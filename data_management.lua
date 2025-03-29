@@ -9,7 +9,7 @@ function SaveData()
         level = Level, player = { x = Player.x, y = Player.y, xvelocity = Player.xvelocity, yvelocity = Player.yvelocity, temperature = Player.temperature, superJump = Player.superJump },
         playerSkill = { turretsDestroyed = PlayerSkill.turretsDestroyed, deaths = PlayerSkill.deaths, greatestBulletPresence = PlayerSkill.greatestBulletPresence, enemiesKilled = PlayerSkill.enemiesKilled },
         wayPoints = WayPoints, playerPerks = PlayerPerks, timeOnThisLevel = TimeOnThisLevel, dialogueDone = dialogueDone, totalTime = TotalTime, deathPositions = DeathPositions,
-        enemies = Enemies, bestGameCompletionTime = BestGameCompletionTime, settings = Settings, playerCanMove = PlayerCanMove, descensionLevels = Descending.onLevels,
+        enemies = Enemies, bestGameCompletionTime = BestGameCompletionTime, settings = Settings, playerCanMove = PlayerCanMove, descensionLevels = Descending.onLevels, playerUpgrades = PlayerUpgrades
     }
 
     love.filesystem.write("data.csv", lume.serialize(data))
@@ -37,6 +37,10 @@ function LoadData()
     DeathPositions = (data.deathPositions and data.deathPositions or {})
     Enemies = (data.enemies and data.enemies or {})
     Descending.onLevels = (data.descensionLevels and data.descensionLevels or PickDescensionLevels())
+
+    if data.playerUpgrades then
+        PlayerUpgrades = data.playerUpgrades
+    end
 
     if data.playerPerks then
         PlayerPerks = data.playerPerks

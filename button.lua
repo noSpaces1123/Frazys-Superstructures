@@ -26,7 +26,7 @@ function NewButton(text, x, y, width, height, lineColor, fillColor, mouseOverFil
 
             if self.enable(self) then
 
-                if not before and self.mouseOver then
+                if not before and self.mouseOver and not self.grayedOut then
                     PlaySFX(SFX.hover, 0.6, 1)
                 end
 
@@ -35,7 +35,7 @@ function NewButton(text, x, y, width, height, lineColor, fillColor, mouseOverFil
             end
         end,
         mouseClick = function (self, key)
-            if self.mouseOver and self.enable() and not ClickedWithMouse then
+            if self.mouseOver and self.enable() and not ClickedWithMouse and not self.grayedOut then
                 self.func(self)
                 ClickedWithMouse = true
                 PlaySFX(SFX.click, 0.6, 1)
