@@ -670,7 +670,7 @@ function love.load()
 
     Enemies = {}
 
-    PickingUpgrade = false
+    InitialiseUpgrades()
 
     if love.filesystem.getInfo("data.csv") then
         LoadData()
@@ -2163,9 +2163,62 @@ function UpdateSlowMo()
     end
 end
 
+function InitialiseUpgrades()
+    PickingUpgrade = false
+
+    AnalyticsUpgrades = {
+        ["level height display"] = false,
+    }
+
+    UpgradeData = {
+        jumpHeightIncrement = 2,
+        speedIncrement = 0.06,
+        spacingOnMenu = 700,
+    }
+
+    Upgrades = {
+        ["jump height"] = {
+            "hop",
+            "hop higher",
+            "leap",
+            "leap higher",
+            "fly",
+            "fly higher",
+        },
+        ["speed"] = {
+            "run",
+            "run faster",
+            "sprint",
+            "sprint faster",
+            "drive",
+            "drive faster",
+        },
+        ["analytics"] = {},
+    }
+
+    for key, _ in pairs(AnalyticsUpgrades) do
+        table.insert(Upgrades["analytics"], key)
+    end
+end
+function ApplyUpgrades()
+    Player.jumpStrength = Player.baseJumpStrength + PlayerUpgrades["jump height"] * UpgradeData.jumpHeightIncrement
+    Player.speed = Player.baseSpeed + PlayerUpgrades["speed"] * UpgradeData.speedIncrement
+
+    for i = 1, PlayerUpgrades["analytics"] do
+        AnalyticsUpgrades[Upgrades["analytics"][i]] = true
+    end
+end
 function DrawUpgradeMenuOverlay()
     love.graphics.setColor(0,0,0, 0.2)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
-    DrawTextWithBackground("")
+    local listOfCategories = {}
+    for key, _ in pairs(Upgrades) do
+        table.insert(listOfCategories, key)
+    end
+
+    for index = 1, 3 do
+        DrawTextWithBackground(string.upper(Upgrades[listOfCategories[index]]) .. ":" .. string.upper(Upgrades[listOfCategories[index]][PlayerUpgrades[listOfCategories[index]]]),
+        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2), Fonts.medium, {1,1,1}, {0,0,0})
+    end
 end

@@ -2,7 +2,7 @@ function LoadPlayer()
     Player = {
         x = 0, y = Boundary.y + Boundary.height,
         width = 10, height = 10, color = { 0,1,1 }, zoom = 0.4,
-        speed = 0.4, netSpeed = 0, jumpStrength = 23, wallJumpXStrength = 10, jumped = false,
+        baseSpeed = 0.4, speed = nil, netSpeed = 0, baseJumpStrength = 23, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
         standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false }, touchingStickyObject = false, touchingBottomOfObject = false,
         coyote = { current = 0, max = 10, running = false },
@@ -23,6 +23,8 @@ function LoadPlayer()
         doubleJumpUsed = false,
         enemyKillForgiveness = 3, destroyingTurretFireRateRangeDiminishment = 270,
     }
+    Player.jumpStrength = Player.baseJumpStrength
+    Player.speed = Player.baseSpeed
     WayPoints = {}
 end
 function RespawnPlayer()
@@ -48,9 +50,13 @@ function ResetPlayerData()
     }
 
     PlayerPerks = {}
-
-    for key, value in pairs(ShrineGlobalData.types) do
+    for key, _ in pairs(ShrineGlobalData.types) do
         PlayerPerks[key] = false
+    end
+
+    PlayerUpgrades = {}
+    for key, _ in pairs(Upgrades) do
+        PlayerUpgrades[key] = 0
     end
 end
 function ResetGame()
