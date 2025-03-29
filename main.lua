@@ -733,7 +733,7 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.1.3"
+    Version = "1.2"
     Changelog = Version ..
 [[
  Changelog:
@@ -745,9 +745,12 @@ function love.load()
     - Change: Removed upwards velocity after Hooligman cutscenes
     - New: Hooligan density increases with every descension level
     - New: Platform spawns below player when starting a descension level
+    - Fixed: Player magnetism particles pointing downwards in descension levels
+    - New: Super jump in descension levels now go downwards
 
     Bug fixes:
     - Fixed: Checkpoints inaccessible inside other platforms
+    - Fixed: Game pausing when you unfocus the window while you're in the game's menu
 ]]
 
     TimeMultiplier = 1

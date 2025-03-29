@@ -521,10 +521,10 @@ end
 
 function DoPlayerGoalMagentismParticles()
     local maxDistance = 300
-    if Player.y <= maxDistance and lume.randomchoice({true,false}) then
+    if ((not Descending.doingSo and Player.y <= maxDistance) or (Descending.doingSo and Player.y >= Boundary.y + Boundary.height - maxDistance)) and lume.randomchoice({true,false}) then
         local ratio = math.abs(Player.y / maxDistance)
 
-        table.insert(Particles, NewParticle(math.random(Player.x, Player.x + Player.width), Player.y + Player.height / 2, math.random(), Player.color, math.random() * ratio * 3 + 1, 180, 0, math.random(200, 400)))
+        table.insert(Particles, NewParticle(math.random(Player.x, Player.x + Player.width), Player.y + Player.height / 2, math.random(), Player.color, math.random() * ratio * 3 + 1, 180, (Descending.doingSo and 180 or 0), math.random(200, 400)))
     end
 end
 
@@ -744,7 +744,7 @@ function DoPlayerSuperJump()
     if not Dialogue.list[13].done then return end
 
     if CanSuperJump() then
-        Player.yvelocity = Player.yvelocity - Player.superJumpStrength
+        Player.yvelocity = Player.yvelocity + Player.superJumpStrength * (Descending.doingSo and 1 or -1)
         Player.superJump.current = Player.superJump.current - Player.superJump.cost
     end
 end
