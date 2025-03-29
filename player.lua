@@ -101,6 +101,7 @@ end
 
 function love.keypressed(key)
     if key == "escape" then
+        if GameState == "complete" then ResetGame() end
         GameState = "menu"
         SaveData()
     elseif not Player.respawnWait.dead and key ~= "d" and key ~= "a" then
@@ -984,15 +985,15 @@ function NewWayPoint(x, y)
 end
 function CheckCollisionWithWayPoint()
     for _, waypoint in ipairs(WayPoints) do
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, waypoint.x, waypoint.y) <= waypoint.radius then
+        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, waypoint.x, waypoint.y) <= waypoint.radius * 4 then
             lume.remove(WayPoints, waypoint)
         end
     end
 end
 function DrawWayPoints()
     for _, waypoint in ipairs(WayPoints) do
-        love.graphics.setColor(waypoint.color)
-        love.graphics.circle("fill", waypoint.x, waypoint.y, waypoint.radius)
+        love.graphics.setColor(waypoint.color[1], waypoint.color[2], waypoint.color[3], math.random() / 2 + .5)
+        love.graphics.circle("fill", waypoint.x + Jitter(1), waypoint.y + Jitter(1), waypoint.radius)
     end
 end
 function DrawWayPointArrow()
@@ -1008,16 +1009,17 @@ function DrawWayPointArrow()
         end
     end
 
-    DrawArrowTowards(closest.x, closest.y, closest.color, 1)
+    DrawArrowTowards(closest.x, closest.y, closest.color, 1, ToPixels(50))
 end
 
-function DrawArrowTowards(x, y, color, size)
+function DrawArrowTowards(x, y, color, size, maxDistance)
     local distance = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, x, y)
+    local ratio = Clamp(1 - distance / maxDistance, 0.1, 1)
     local angle = AngleBetween(Player.x + Player.width / 2, Player.y + Player.height / 2, x, y)
     local points = {
-        Player.x + math.sin(angle - math.rad(20 * size)) * 80, Player.y + math.cos(angle - math.rad(20 * size)) * 80,
+        Player.x + math.sin(angle - math.rad(20 * size * ratio)) * 80, Player.y + math.cos(angle - math.rad(20 * size * ratio)) * 80,
         Player.x + math.sin(angle) * 100,               Player.y + math.cos(angle) * 100,
-        Player.x + math.sin(angle + math.rad(20 * size)) * 80, Player.y + math.cos(angle + math.rad(20 * size)) * 80,
+        Player.x + math.sin(angle + math.rad(20 * size * ratio)) * 80, Player.y + math.cos(angle + math.rad(20 * size * ratio)) * 80,
     }
     love.graphics.setColor(color)
     love.graphics.setLineWidth(2)

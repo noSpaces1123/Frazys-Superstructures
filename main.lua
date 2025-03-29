@@ -43,19 +43,12 @@ function love.load()
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
         },
-        enemySpeak = {
-            love.audio.newSource("assets/sfx/enemy speak.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak2.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak3.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak4.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak5.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak6.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak7.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak8.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak9.wav", "static"),
-            love.audio.newSource("assets/sfx/enemy speak10.wav", "static"),
-        },
+        enemySpeak = {},
     }
+
+    for i = 1, 13 do
+        table.insert(SFX.enemySpeak, love.audio.newSource("assets/sfx/enemy speak" .. i .. ".wav", "static"))
+    end
 
     Sprites = {
         cross = love.graphics.newImage("assets/sprites/cross.png", {dpiscale=10}),
@@ -624,7 +617,7 @@ function love.load()
             {
                 text = "Whoa! That was insane. I can't believe I made it outta there! Let's hope I don't have to go through that again...",
                 when = function ()
-                    return Level == 26
+                    return Level == Descending.onLevels[1] + 1
                 end
             },
             {
@@ -643,6 +636,12 @@ function love.load()
                 text = "([P] to pause)",
                 when = function ()
                     return Level == 1 and Player.y <= Boundary.y + Boundary.height / 2 and not Dialogue.playing.running
+                end
+            },
+            {
+                text = "I guess I did have to go through that again! And it was more difficult this time...",
+                when = function ()
+                    return Level == Descending.onLevels[2] + 1
                 end
             },
         },
@@ -670,6 +669,8 @@ function love.load()
     DeathPositions = {}
 
     Enemies = {}
+
+    PickingUpgrade = false
 
     if love.filesystem.getInfo("data.csv") then
         LoadData()
@@ -874,7 +875,11 @@ function love.draw()
 
             DrawHeatIndicator()
 
-            DrawPausedOverlay()
+            if PickingUpgrade then
+                DrawUpgradeMenuOverlay()
+            else
+                DrawPausedOverlay()
+            end
         end
     elseif GameState == "menu" or GameState == "complete" or GameState == "settings" or GameState == "changelog" then
         love.graphics.push()
@@ -1147,10 +1152,10 @@ function NextLevel()
     TotalTime = TotalTime + TimeOnThisLevel
     TimeOnThisLevel = 0
 
-    if Level >= FinalLevel then
-        FinalLevelReached()
-    elseif CheckIfShouldBeDescending() and not Descending.hooligmanCutscene.running and not Descending.doingSo then
+    if CheckIfShouldBeDescending() and not Descending.hooligmanCutscene.running and not Descending.doingSo then
         PlayHooligmanCutscene()
+    elseif Level >= FinalLevel then
+        FinalLevelReached()
     else
         Level = Level + 1
         Seed = os.time()
@@ -1214,8 +1219,6 @@ function FinalLevelReached()
         BestGameCompletionTime = TotalTime
         SaveData()
     end
-
-    ResetGame()
 end
 function CheckIfShouldBeDescending()
     for _, on in ipairs(Descending.onLevels) do
@@ -1414,6 +1417,9 @@ end
 
 function ToMeters(px)
     return px / 200
+end
+function ToPixels(meters)
+    return meters * 200
 end
 
 function ExtendView()
@@ -1799,7 +1805,7 @@ function DrawShines()
         ::continue::
 
         if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
-            DrawArrowTowards(shrine.x, shrine.y, color, 0.3)
+            DrawArrowTowards(shrine.x, shrine.y, color, 1, ShrineGlobalData.maxHintDistance)
         end
     end
 end
@@ -2155,4 +2161,11 @@ function UpdateSlowMo()
             Paused = true
         end
     end
+end
+
+function DrawUpgradeMenuOverlay()
+    love.graphics.setColor(0,0,0, 0.2)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+
+    DrawTextWithBackground("")
 end
