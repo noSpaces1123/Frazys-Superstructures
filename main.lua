@@ -40,6 +40,7 @@ function love.load()
         stick = love.audio.newSource("assets/sfx/stick.wav", "static"),
         unstick = love.audio.newSource("assets/sfx/unstick.wav", "static"),
         upgrade = love.audio.newSource("assets/sfx/upgrade.wav", "static"),
+        upgradeMenu = love.audio.newSource("assets/sfx/upgrade menu.wav", "static"),
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
@@ -1390,7 +1391,14 @@ function DrawDisplays()
     -- level number
     love.graphics.setColor(1,1,1)
     love.graphics.setFont(Fonts.normal)
-    love.graphics.print("Skill: " .. CalculatePlayerSkill(), Fonts.levelNumber:getWidth(Level) + generalPadding * 2, generalPadding + 26)
+    local nextUpgrade = Level + (Level % UpgradeData.upgradeInterval)
+    for i = Level + 1, Level + UpgradeData.upgradeInterval do
+        if i % UpgradeData.upgradeInterval == 0 then
+            nextUpgrade = i
+            break
+        end
+    end
+    love.graphics.print("Next upgrade: LVL " .. nextUpgrade, Fonts.levelNumber:getWidth(Level) + generalPadding * 2, generalPadding + 26)
 
     love.graphics.setColor(1,1,1)
     love.graphics.setFont(Fonts.levelNumber)
@@ -1819,7 +1827,7 @@ function DrawShines()
 
         ::continue::
 
-        if AnalyticsUpgrades[6].on and Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
+        if AnalyticsUpgrades[5].on and Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
             DrawArrowTowards(shrine.x, shrine.y, color, 1, ShrineGlobalData.maxHintDistance)
         end
     end
@@ -2181,11 +2189,34 @@ end
 function InitialiseUpgrades()
     AnalyticsUpgrades = {}
 
+    SuitUpgrades = {
+        function () -- vault higher
+            Player.divisorWhenConvertingXToYVelocity = 1.7
+        end,
+        function () -- better traction
+            Player.groundFriction = 1.3
+        end,
+        function () -- stronger jump-pads
+            ObjectGlobalData.jumpPlatformStrength = 50
+        end,
+        function () -- vault higher ii
+            Player.divisorWhenConvertingXToYVelocity = 1.3
+        end,
+        function () -- better traction ii
+            Player.groundFriction = 1.7
+        end,
+        function () -- better cooling
+            Player.passiveCooling = 0.7
+        end,
+    }
+
     UpgradeData = {
-        jumpHeightIncrement = 2,
-        speedIncrement = 0.04,
-        spacingOnMenu = 200,
+        jumpHeightIncrement = 1.2,
+        speedIncrement = 0.02,
+        spacingOnMenu = 170,
         picking = false, picked = false,
+        startGettingUpgradesOnLevel = 0,
+        upgradeInterval = 3
     }
 
     Upgrades = {
@@ -2212,13 +2243,23 @@ function InitialiseUpgrades()
             }
         },
         {
+            name = "suit",
+            list = {
+                "stronger jump-pads",
+                "vault higher",
+                "better traction",
+                "better cooling",
+                "vault higher ii",
+                "better traction ii",
+            }
+        },
+        {
             name = "analytics",
             list = {
                 "level height display",
                 "temperature display",
                 "checkpoint display",
                 "minimap",
-                "waypoints",
                 "signal radar",
             }
         },
@@ -2229,8 +2270,8 @@ function InitialiseUpgrades()
     end
 
     local width = 400
-    for index = 1, 3 do
-        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2) + 50, width, 40, {0,0,0}, {0,0,0}, {.2,.2,.2}, {1,1,1},
+    for index = 1, #Upgrades do
+        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2) + 50, width, 40, {0,0,0}, {0,0,0}, {.2,.2,.2}, {1,1,1},
         Fonts.normal, 0, 10, 10, function (self)
             local listOfCategories = {}
             for _, value in ipairs(Upgrades) do
@@ -2245,7 +2286,7 @@ function InitialiseUpgrades()
 
             PlaySFX(SFX.upgrade, 0.4, 1)
         end, function (self)
-            if UpgradeData.picked then
+            if UpgradeData.picked or PlayerUpgrades[Upgrades[index].name] >= #Upgrades[index].list then
                 self.textColor = {.3,.3,.3}
                 self.mouseOverFillColor = self.fillColor
                 self.lineColor = self.textColor
@@ -2261,7 +2302,7 @@ function InitialiseUpgrades()
         end)
     end
 
-    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 80, width, 40, {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.medium, 4, 10, 10, function (self)
+    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 80, width, 40, {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.normal, 2, 10, 10, function (self)
         UpgradeData.picked, UpgradeData.picking = false, false
         PlaySFX(SFX.playerSpawn, 0.5, 1)
     end, nil, function ()
@@ -2275,9 +2316,16 @@ function ApplyUpgrades()
     for i = 1, PlayerUpgrades["analytics"] do
         AnalyticsUpgrades[i].on = true
     end
+
+    for i = 1, PlayerUpgrades["suit"] do
+        SuitUpgrades[i]()
+    end
 end
 function OpenUpgradeMenu()
-    UpgradeData.picking = true
+    if Level >= UpgradeData.startGettingUpgradesOnLevel and Level % UpgradeData.upgradeInterval == 0 then
+        UpgradeData.picking = true
+        PlaySFX(SFX.upgradeMenu, 0.7, 1)
+    end
 end
 function DrawUpgradeMenuOverlay()
     love.graphics.setColor(0,0,0, 0.5)
@@ -2288,10 +2336,24 @@ function DrawUpgradeMenuOverlay()
         table.insert(listOfCategories, value.name)
     end
 
-    for index = 1, 3 do
+    for index = 1, #Upgrades do
         local category = Upgrades[index].name
         local level = Upgrades[index].list[PlayerUpgrades[category]]
-        DrawTextWithBackground(string.upper(category) .. ": " .. string.upper((level and level .. " unlocked" or "not upgraded")),
-        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - 2), Fonts.medium, (level and {1,1,1} or {1,0,0}), {0,0,0})
+        local text = string.upper(category) .. ": " .. string.upper((level and level .. " unlocked" or "not upgraded"))
+
+        DrawTextWithBackground(text,
+        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2), Fonts.medium, (level and {1,1,1} or {1,0,0}), {0,0,0})
+
+        local nextLevel = Upgrades[index].list[PlayerUpgrades[category]+1]
+        local subText
+        if nextLevel == nil then
+            subText = "Path complete"
+        else
+            subText = "next: " .. nextLevel
+        end
+        DrawTextWithBackground(subText,
+        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2) + 30, Fonts.normal, {.5,.5,.5}, {0,0,0})
     end
+
+    DrawTextWithBackground("PICK AN UPGRADE", love.graphics.getWidth() / 2, 80, Fonts.big, {1,1,0}, {0,0,0,0})
 end

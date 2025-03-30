@@ -17,7 +17,7 @@ function LoadPlayer()
         superJump = { current = 0, max = 1500, cost = 900, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
         checkpoint = { x = nil, y = nil },
         timeStill = 0, timeStillFocusDivisor = 200,
-        renderDistance = 4000,
+        renderDistance = 3000,
         wallPush = false,
         instinctOfTheBulletJumperDistance = 700,
         doubleJumpUsed = false,
@@ -187,7 +187,7 @@ end
 
 function love.mousepressed(mx, my, button)
     if GameState == "game" then
-        if button == 1 and Minimap.showing and AnalyticsUpgrades[5].on then
+        if button == 1 and Minimap.showing then
             love.graphics.push()
 
             InitialiseMinimapCoordinateAlterations()

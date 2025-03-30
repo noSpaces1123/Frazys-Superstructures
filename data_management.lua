@@ -82,6 +82,7 @@ function LoadData()
     CorrectBoundaryHeight()
     CorrectTurretDensity()
     CorrectEnemyDensity()
+    ApplyUpgrades()
 
     ApplyShrineEffects()
 end
