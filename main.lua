@@ -736,24 +736,31 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.2"
+    Version = "1.3"
     Changelog = Version ..
 [[
  Changelog:
 
-    Map discovery:
-    - New: Added map discovery (only objects for now)
+    Waypoints and signal radar:
+    - New: All arrows now squish based on distance
+    - Change: Waypoints' hitbox increased
 
-    Hooligman encounters:
-    - Change: Removed upwards velocity after Hooligman cutscenes
-    - New: Hooligan density increases with every descension level
-    - New: Platform spawns below player when starting a descension level
-    - Fixed: Player magnetism particles pointing downwards in descension levels
-    - New: Super jump in descension levels now go downwards
+    Hooligans:
+    - New: Added more speaking SFX
 
-    Bug fixes:
-    - Fixed: Checkpoints inaccessible inside other platforms
-    - Fixed: Game pausing when you unfocus the window while you're in the game's menu
+    Descension levels:
+    - Fixed: Dialogue for completing the first descension level coming at level 26 rather than directly after first descension level
+    - Fixed: Final descension level not triggering upon reaching the top of level 50
+
+    Completing a run:
+    - Fixed: Total time displaying as 0:00:00 when completing a run
+
+    Settings:
+    - Change: Turned down the volume of the buzz SFX when resetting your current run
+    - Change: Made the confirmation process of resetting your current run easier to follow
+
+    Upgrades:
+    - New: Added permanent upgrades. A choice between which path to progress is proposed every third level
 ]]
 
     TimeMultiplier = 1
@@ -1409,14 +1416,11 @@ function DrawDisplays()
     love.graphics.setFont(Fonts.normal)
 
     local text = ""
-    if AnalyticsUpgrades[1].on then
-        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " m / " .. ToMeters(Boundary.height)
+    if AnalyticsUpgrades["misc display"] then
+        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil")
     end
-    if AnalyticsUpgrades[2].on then
+    if AnalyticsUpgrades["temperature display"] then
         text = text .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
-    end
-    if AnalyticsUpgrades[3].on then
-        text = text .. " | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil")
     end
 
     love.graphics.printf(text, 0, generalPadding, love.graphics.getWidth() - generalPadding * 2, "center")
@@ -1827,7 +1831,7 @@ function DrawShines()
 
         ::continue::
 
-        if AnalyticsUpgrades[5].on and Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
+        if AnalyticsUpgrades["signal radar"] and Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
             DrawArrowTowards(shrine.x, shrine.y, color, 1, ShrineGlobalData.maxHintDistance)
         end
     end
@@ -2256,17 +2260,16 @@ function InitialiseUpgrades()
         {
             name = "analytics",
             list = {
-                "level height display",
+                "misc display",
                 "temperature display",
-                "checkpoint display",
                 "minimap",
                 "signal radar",
             }
         },
     }
 
-    for index, value in ipairs(Upgrades[3].list) do
-        AnalyticsUpgrades[index] = { name = value, on = false }
+    for _, value in ipairs(Upgrades[3].list) do
+        AnalyticsUpgrades[value] = false
     end
 
     local width = 400
@@ -2313,8 +2316,11 @@ function ApplyUpgrades()
     Player.jumpStrength = Player.baseJumpStrength + PlayerUpgrades["jump height"] * UpgradeData.jumpHeightIncrement
     Player.speed = Player.baseSpeed + PlayerUpgrades["speed"] * UpgradeData.speedIncrement
 
-    for i = 1, PlayerUpgrades["analytics"] do
-        AnalyticsUpgrades[i].on = true
+    local index = 1
+    for _, value in ipairs(Upgrades[4].list) do
+        AnalyticsUpgrades[value] = true
+        index = index + 1
+        if index >= PlayerUpgrades["analytics"] then break end
     end
 
     for i = 1, PlayerUpgrades["suit"] do

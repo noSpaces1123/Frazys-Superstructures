@@ -154,7 +154,7 @@ function UpdateKeyBuffer()
             SaveData()
         elseif key == "q" and not Paused and GameState == "game" then
             DoPlayerSuperJump()
-        elseif key == "m" and GameState == "game" and AnalyticsUpgrades[4].on then
+        elseif key == "m" and GameState == "game" and AnalyticsUpgrades["minimap"] then
             ToggleMinimap()
         elseif key == "p" and not Minimap.showing and GameState == "game" then
             if Paused then
