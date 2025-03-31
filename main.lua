@@ -736,31 +736,13 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.3"
+    Version = "1.3.1"
     Changelog = Version ..
 [[
  Changelog:
 
-    Waypoints and signal radar:
-    - New: All arrows now squish based on distance
-    - Change: Waypoints' hitbox increased
-
-    Hooligans:
-    - New: Added more speaking SFX
-
-    Descension levels:
-    - Fixed: Dialogue for completing the first descension level coming at level 26 rather than directly after first descension level
-    - Fixed: Final descension level not triggering upon reaching the top of level 50
-
-    Completing a run:
-    - Fixed: Total time displaying as 0:00:00 when completing a run
-
-    Settings:
-    - Change: Turned down the volume of the buzz SFX when resetting your current run
-    - Change: Made the confirmation process of resetting your current run easier to follow
-
     Upgrades:
-    - New: Added permanent upgrades. A choice between which path to progress is proposed every third level
+    - Change: Checkpoint display and level height display bundled together into level 1 of analytics
 ]]
 
     TimeMultiplier = 1
