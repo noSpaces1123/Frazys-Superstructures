@@ -193,6 +193,55 @@ function love.load()
         },
     }
 
+    BubGlobalData = {
+        noticeDistance = ToPixels(4),
+        dialogueSpacingFromBub = 60,
+        edgeRounding = 10,
+        types = {
+            ["Jack"] = {
+                width = 10, height = 10, color = { 176/255, 127/255, 63/255 },
+                voiceLines = {
+                    greeting = {
+                        "Hi! I'm Jack. Wanna play some blackjack?",
+                        "Hiya bub! The name's Jack. Wanna play some blackjack?",
+                        "Hi! My name's Jack. Down for some blackjack?",
+                        "Hey bub! My name's Jack. Wanna play blackjack?",
+                        "Hey! My name's Jack and I sure love me some blackjack. Wanna play?",
+                    },
+                    hitOrStay = {
+                        "Move left to hit, right to stay.",
+                    },
+                    hit = {
+                        "I like your style, bub.",
+                        "Interesting choice.",
+                        "I'm on your side, my friend.",
+                        "Let's hope this goes well.",
+                    },
+                    stay = {
+                        "Playing it safe, hmm?",
+                        "You do you.",
+                        "Interesting choice.",
+                        "I admire your caution.",
+                    },
+                    win = {
+                        "Nice job, bub!",
+                        "Well played, bub!",
+                        "Masterfully executed.",
+                        "Well done!"
+                    },
+                    lose = {
+                        "Aww, I was rootin' for you...",
+                        "Better luck next time, bub.",
+                        "Well, you had the right idea.",
+                    },
+                },
+                event = function (self)
+                    
+                end
+            }
+        }
+    }
+
     PosterGlobalData = {
         spacingFromEdgesOfObject = 20,
         density = 0.05, -- posters to generate = density x number of objects
@@ -802,6 +851,7 @@ function love.update(dt)
                         UpdateMessages()
                         UpdateEnemies()
                         UpdateDialogue()
+                        UpdateBubDialogue()
                         DiscoverAndRenderObjects()
                     end
 
@@ -830,6 +880,8 @@ function love.update(dt)
             Particles = {}
         end
     end
+
+    SaveFrames()
 end
 
 function love.draw()
@@ -879,6 +931,8 @@ function love.draw()
 
             DrawHooligman()
             DrawHooligmanDialogue()
+
+            DrawBubDialogue()
 
             DrawCursorReadings()
             DrawDialogue()
@@ -1452,10 +1506,7 @@ function DrawDisplays()
 
     local text = ""
     if AnalyticsUpgrades["misc display"] then
-        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil")
-    end
-    if AnalyticsUpgrades["temperature display"] then
-        text = text .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
+        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil") .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
     end
 
     love.graphics.printf(text, 0, generalPadding, love.graphics.getWidth() - generalPadding * 2, "center")
@@ -2296,7 +2347,6 @@ function InitialiseUpgrades()
             name = "analytics",
             list = {
                 "misc display",
-                "temperature display",
                 "minimap",
                 "signal radar",
             }
@@ -2457,4 +2507,11 @@ function DrawDebug()
 
         5, 200, love.graphics.getWidth(), "left"
     )
+end
+
+function SaveFrames()
+    if love.timer.getAverageDelta() > 0.07 then
+        SaveData()
+        LoadData()
+    end
 end

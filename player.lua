@@ -138,7 +138,7 @@ function UpdateKeyBuffer()
         local key = tuple.key
         local did = true
 
-        if key == "space" and not Paused and (Player.standingOnObject or Player.coyote.running or Player.touchingBottomOfObject or (PlayerPerks["Power of the Achiever"] and not Player.doubleJumpUsed)) then -- jumping
+        if key == "space" and not Paused and PlayerCanMove and (Player.standingOnObject or Player.coyote.running or Player.touchingBottomOfObject or (PlayerPerks["Power of the Achiever"] and not Player.doubleJumpUsed)) then -- jumping
             if Player.touchingBottomOfObject then
                 Player.yvelocity = Player.yvelocity + Player.jumpStrength
             else
