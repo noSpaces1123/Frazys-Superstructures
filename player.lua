@@ -79,7 +79,7 @@ function UpdatePlayer()
     DoPlayerKeyPresses()
     UpdateKeyBuffer()
 
-    if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running then
+    if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running and not CommandLine.typing then
         Player.yvelocity = ApplyGravity(Player)
 
         UpdatePlayerCoyote()
@@ -107,12 +107,28 @@ end
 
 function love.keypressed(key)
     if key == "escape" then
-        if GameState == "complete" then ResetGame() end
-        GameState = "menu"
-        SaveData()
-    elseif not Player.respawnWait.dead and key ~= "d" and key ~= "a" then
+        if CommandLine.typing then
+            CommandLine.typing = false
+        else
+            if GameState == "complete" then ResetGame() end
+            GameState = "menu"
+            SaveData()
+        end
+    elseif CommandLine.typing then
+        if key == "backspace" and #CommandLine.text > 0 then
+            CommandLine.text = string.sub(CommandLine.text, 1, #CommandLine.text - 1)
+        elseif key == "return" then
+            RunCommandLine()
+        end
+    elseif not Player.respawnWait.dead and key ~= "d" and key ~= "a" and not CommandLine.typing then
         table.insert(KeyBuffer, { key = key, time = 10 })
     end
+end
+
+function love.textinput(text)
+    if not CommandLine.typing then return end
+
+    CommandLine.text = CommandLine.text .. text
 end
 
 function UpdateKeyBuffer()
@@ -166,6 +182,8 @@ function UpdateKeyBuffer()
             GenerateObjects()
             LoadPlayer()
             SaveData()
+        elseif key == "0" then
+            CommandLine.typing = true
         else
             did = false
         end

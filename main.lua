@@ -56,7 +56,13 @@ function love.load()
         cross = love.graphics.newImage("assets/sprites/cross.png", {dpiscale=10}),
         controls = love.graphics.newImage("assets/sprites/controls.png", {dpiscale=8}),
         fullControls = love.graphics.newImage("assets/sprites/full controls.png", {dpiscale=7}),
+        posters = {}
     }
+    for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/posters")) do
+        if index == 1 then goto next end
+        table.insert(Sprites.posters, love.graphics.newImage("assets/sprites/posters/" .. fileName, {dpiscale=8}))
+        ::next::
+    end
 
     Fonts = {
         normal = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 17),
@@ -185,6 +191,11 @@ function love.load()
                 func = function () end
             },
         },
+    }
+
+    PosterGlobalData = {
+        spacingFromEdgesOfObject = 20,
+        density = 0.05, -- posters to generate = density x number of objects
     }
 
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
@@ -672,6 +683,8 @@ function love.load()
 
     Enemies = {}
 
+    Bubs = {}
+
     Buttons = {}
     InitialiseButtons()
 
@@ -732,6 +745,12 @@ function love.load()
 
     MenuAnimation = { x = 0, overlay = 0, objectIntro = 0 }
 
+    CommandLine = {
+        typing = false,
+        text = "",
+        history = {},
+    }
+
     GameState = "menu"
 
     ClickedWithMouse = false
@@ -745,66 +764,71 @@ function love.load()
     - Change: Checkpoint display and level height display bundled together into level 1 of analytics
 ]]
 
+    Debug = false
+
     TimeMultiplier = 1
     SlowMo = { current = 0, max = 20, slowingDown = false, running = false }
 
     GlobalUnaffectedDT = 0
     GlobalDT = 0
+    ::continue::
 end
 
 function love.update(dt)
     GlobalUnaffectedDT = dt * 60
     GlobalDT = GlobalUnaffectedDT * TimeMultiplier
 
-    UpdateSlowMo()
+    if not CommandLine.typing then
+        UpdateSlowMo()
 
-    if not UpgradeData.picking then
-        if GameState == "game" then
-            UpdatePlayer()
-            UpdateShakeIntensity()
-            UpdateDangerPulseProgression()
-            UpdateCamLookAhead()
-            ExtendView()
+        if not UpgradeData.picking then
+            if GameState == "game" then
+                UpdatePlayer()
+                UpdateShakeIntensity()
+                UpdateDangerPulseProgression()
+                UpdateCamLookAhead()
+                ExtendView()
 
-            UpdateNextLevelAnimation()
+                UpdateNextLevelAnimation()
 
-            if not Paused then
-                TimeOnThisLevel = TimeOnThisLevel + dt
+                if not Paused then
+                    TimeOnThisLevel = TimeOnThisLevel + dt
 
-                if not Descending.hooligmanCutscene.running then
-                    UpdateParticles()
-                    UpdateTurrets()
-                    UpdateBullets()
-                    UpdateShrines()
-                    UpdateMessages()
-                    UpdateEnemies()
-                    UpdateDialogue()
-                    DiscoverObjects()
+                    if not Descending.hooligmanCutscene.running then
+                        UpdateParticles()
+                        UpdateTurrets()
+                        UpdateBullets()
+                        UpdateShrines()
+                        UpdateMessages()
+                        UpdateEnemies()
+                        UpdateDialogue()
+                        DiscoverAndRenderObjects()
+                    end
+
+                    UpdateHooligmanCutscene()
+                    UpdateHooligmanDialogue()
                 end
 
-                UpdateHooligmanCutscene()
-                UpdateHooligmanDialogue()
+                --CheckForOddities()
+
+                UpdateSaveInterval()
+            else
+                UpdateTurrets()
             end
-
-            --CheckForOddities()
-
-            UpdateSaveInterval()
-        else
-            UpdateTurrets()
         end
-    end
 
-    UpdateButtons()
+        UpdateButtons()
 
-    if GameCompleteFlash > 0 then
-        GameCompleteFlash = GameCompleteFlash - 0.005 * GlobalDT
-        if GameCompleteFlash < 0 then
-            GameCompleteFlash = 0
+        if GameCompleteFlash > 0 then
+            GameCompleteFlash = GameCompleteFlash - 0.005 * GlobalDT
+            if GameCompleteFlash < 0 then
+                GameCompleteFlash = 0
+            end
         end
-    end
 
-    if Settings.graphics.current == 1 then
-        Particles = {}
+        if Settings.graphics.current == 1 then
+            Particles = {}
+        end
     end
 end
 
@@ -869,11 +893,15 @@ function love.draw()
 
             DrawHeatIndicator()
 
+            DrawDebug()
+
             if UpgradeData.picking then
                 DrawUpgradeMenuOverlay()
             else
                 DrawPausedOverlay()
             end
+
+            DrawCommandLineOverlay()
         end
     elseif GameState == "menu" or GameState == "complete" or GameState == "settings" or GameState == "changelog" then
         love.graphics.push()
@@ -969,7 +997,7 @@ end
 
 function DrawObjects()
     for _, obj in ipairs(Objects) do
-        if Distance(obj.x + obj.width / 2, obj.y + obj.height / 2, Player.x, Player.y) > Player.renderDistance and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
+        if not obj.render and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
 
         love.graphics.setColor(.7,.7,.7, 1)
         love.graphics.setLineWidth(ObjectGlobalData.strokeWidth)
@@ -978,7 +1006,7 @@ function DrawObjects()
         ::continue::
     end
     for _, obj in ipairs(Objects) do
-        local outsideRenderDistance = Distance(obj.x + obj.width / 2, obj.y + obj.height / 2, Player.x, Player.y) > Player.renderDistance
+        local outsideRenderDistance = not obj.render
         if not obj.discovered and GameState == "game" then goto continue end
         if outsideRenderDistance and not obj.discovered and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
         if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
@@ -1014,6 +1042,20 @@ function DrawObjects()
             for x = obj.x, obj.width + obj.x, ObjectGlobalData.groundZeroNotchSpacing do
                 love.graphics.line(x, obj.y, x, obj.y + ObjectGlobalData.groundZeroNotchLength)
             end
+        end
+
+        ::continue::
+    end
+
+    for _, obj in ipairs(Objects) do
+        local outsideRenderDistance = not obj.render
+        if not obj.discovered and GameState == "game" then goto continue end
+        if outsideRenderDistance and not obj.discovered and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
+        if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
+
+        if obj.poster ~= nil then
+            love.graphics.setColor(1,1,1)
+            love.graphics.draw(Sprites.posters[obj.poster.type], obj.x + obj.poster.x, obj.y + PosterGlobalData.spacingFromEdgesOfObject)
         end
 
         ::continue::
@@ -1061,6 +1103,14 @@ function GenerateObjects()
         })
     end
 
+    -- posters
+    for _ = 1, #Objects * PosterGlobalData.density do
+        local index = math.random(#Objects)
+        Objects[index].poster = {}
+        Objects[index].poster.type = math.random(#Sprites.posters)
+        Objects[index].poster.x = lume.randomchoice({PosterGlobalData.spacingFromEdgesOfObject, Objects[index].width - PosterGlobalData.spacingFromEdgesOfObject - Sprites.posters[Objects[index].poster.type]:getWidth()})
+    end
+
     -- safe area
     local thoseToRemove = {}
     for index, obj in ipairs(Objects) do
@@ -1079,7 +1129,7 @@ function GenerateObjects()
     SpawnEnemies()
     GenerateBG()
 end
-function DiscoverObjects()
+function DiscoverAndRenderObjects()
     for _, obj in ipairs(Objects) do
         love.graphics.push()
         InitialiseRegularCoordinateAlterations()
@@ -1093,6 +1143,9 @@ function DiscoverObjects()
 
         if Touching(objX, objY, obj.width, obj.height, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
             obj.discovered = true
+            obj.render = true
+        else
+            obj.render = false
         end
     end
 end
@@ -2344,4 +2397,64 @@ function DrawUpgradeMenuOverlay()
     end
 
     DrawTextWithBackground("PICK AN UPGRADE", love.graphics.getWidth() / 2, 80, Fonts.big, {1,1,0}, {0,0,0,0})
+end
+
+function DrawCommandLineOverlay()
+    if not CommandLine.typing then return end
+
+    love.graphics.setColor(0,0,0, 0.5)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+
+    local spacing = 10
+    love.graphics.setColor(0,1,0)
+    love.graphics.setFont(Fonts.medium)
+    love.graphics.print(CommandLine.text .. "_", spacing, love.graphics.getHeight() - spacing - Fonts.medium:getHeight())
+
+    love.graphics.setColor(0,1,0,.5)
+    for index, text in ipairs(CommandLine.history) do
+        love.graphics.print(text, spacing, love.graphics.getHeight() - spacing - Fonts.medium:getHeight() * (#CommandLine.history - index + 2))
+    end
+end
+function RunCommandLine()
+    table.insert(CommandLine.history, CommandLine.text)
+    lume.dostring(CommandLine.text)
+    CommandLine.text = ""
+end
+function Print(text)
+    table.insert(CommandLine.history, "> " .. text)
+end
+
+function DrawDebug()
+    if not Debug then return end
+
+    local enemiesRendered = 0
+    for _, enemy in ipairs(Enemies) do
+        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2) <= Player.renderDistance then
+            enemiesRendered = enemiesRendered + 1
+        end
+    end
+
+    local objsRendered = 0
+    for _, obj in ipairs(Objects) do
+        if obj.render then
+            objsRendered = objsRendered + 1
+        end
+    end
+
+    local turretsRendered = 0
+    for _, turret in ipairs(Turrets) do
+        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, turret.x, turret.y) <= Player.renderDistance then
+            turretsRendered = turretsRendered + 1
+        end
+    end
+
+    love.graphics.setColor(0,1,0)
+    love.graphics.printf(
+        "Hooligans " .. enemiesRendered ..
+        "\nObjs " .. objsRendered ..
+        "\nTurrets " .. turretsRendered ..
+        "\nAvg DT ms: " .. math.floor(love.timer.getAverageDelta() * 100 * 1000) / 100,
+
+        5, 200, love.graphics.getWidth(), "left"
+    )
 end
