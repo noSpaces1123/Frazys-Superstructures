@@ -46,7 +46,7 @@ function DrawBubs()
         end
 
         love.graphics.setColor(0,0,0)
-        love.graphics.circle("fill", eyeX, eyeY, eyeRadius)
+        love.graphics.circle("fill", eyeX, eyeY, eyeRadius, 100)
     end
 end
 
@@ -72,11 +72,11 @@ end
 function ResetBlackjackDeck()
     Blackjack.cards = {}
     for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/blackjack")) do
-        if index == 1 then goto continue end
-        table.insert(Blackjack.cards, { sprite = love.graphics.newImage("assets/sprites/blackjack/" .. fileName, {dpiscale=10}), worth = tonumber(lume.split(lume.split(fileName, " ")[2], ".")[1]), suit = lume.split(fileName, " ")[1] })
+        if index == 1 or fileName == "unknown.png" then goto continue end
+        table.insert(Blackjack.cards, { sprite = love.graphics.newImage("assets/sprites/blackjack/" .. fileName, {dpiscale=10}), worth = Clamp(tonumber(lume.split(lume.split(fileName, " ")[2], ".")[1]), 1, 10), suit = lume.split(fileName, " ")[1] })
         ::continue::
     end
-
+    Blackjack.unknownSprite = love.graphics.newImage("assets/sprites/blackjack/unknown.png", {dpiscale=10})
     --error(lume.serialize(Blackjack.cards))
 end
 function BlackjackDeal(numberOfCards, person)
@@ -98,9 +98,9 @@ function BlackjackDeal(numberOfCards, person)
         end
     end
 
-    return CheckBlackjackWinner()
+    return CheckBlackjackWinner(true)
 end
-function CheckBlackjackWinner()
+function CheckBlackjackWinner(hit)
     local playerTotal, dealerTotal = CalculateBlackjackTotal()
     if playerTotal > Blackjack.bust then
         return "player bust"
@@ -110,32 +110,38 @@ function CheckBlackjackWinner()
         return "dealer bust"
     elseif dealerTotal == Blackjack.bust then
         return "dealer spot-on"
-    elseif dealerTotal < playerTotal then
+    elseif dealerTotal < playerTotal and not hit then
         return "player higher total"
-    elseif dealerTotal > playerTotal then
+    elseif dealerTotal > playerTotal and not hit then
         return "dealer higher total"
-    elseif dealerTotal == playerTotal then
+    elseif dealerTotal == playerTotal and not hit then
         return "tie"
     end
 end
 function CalculateBlackjackTotal()
-    local player = 0; for _, card in ipairs(Player.blackjackCards) do player = player + card.worth end
-    local dealer = 0; for _, card in ipairs(Blackjack.dealerCards) do dealer = dealer + card.worth end
+    local player = 0; if Player.blackjackCards ~= nil then for _, card in ipairs(Player.blackjackCards) do player = player + card.worth end end
+    local dealer = 0; for index, card in ipairs(Blackjack.dealerCards) do if not (index == 2 and Bubs[Player.bubEngagementIndex].phase ~= "play again") then dealer = dealer + card.worth end end
     return player, dealer
 end
 function DisplayBlackjackHand(person)
-    local cards, xAnchor, yAnchor
-    if person == "player" then cards, xAnchor, yAnchor = Player.blackjackCards, Player.centerX, Player.y
-    elseif person == "dealer" then cards, xAnchor, yAnchor = Blackjack.dealerCards, Bubs[Player.bubEngagementIndex].x + BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].width / 2, Bubs[Player.bubEngagementIndex].y
-    end
+    local bub = Bubs[Player.bubEngagementIndex]
+    if bub.phase == "waiting" or bub.phase == "play again" then
+        local cards, xAnchor, yAnchor
+        if person == "player" then cards, xAnchor, yAnchor = Player.blackjackCards, Player.centerX, Player.y
+        elseif person == "dealer" then cards, xAnchor, yAnchor = Blackjack.dealerCards, bub.x + BubGlobalData.types[bub.type].width / 2, bub.y
+        end
 
-    if cards == nil then
-        return
-    end
+        if cards == nil then return end
 
-    local spacing = 10
-    love.graphics.setColor(1,1,1)
-    for index, card in ipairs(cards) do
-        love.graphics.draw(card.sprite, (index - (#cards + 1) / 2) * (card.sprite:getWidth() + spacing) - card.sprite:getWidth() / 2 + xAnchor, yAnchor - card.sprite:getHeight() - 50)
+        local spacing = 10
+        local away = 100
+        love.graphics.setColor(1,1,1)
+        for index, card in ipairs(cards) do
+            local sprite = ((person == "dealer" and index == 2 and bub.phase ~= "play again") and Blackjack.unknownSprite or card.sprite)
+            love.graphics.draw(sprite, (index - (#cards + 1) / 2) * (card.sprite:getWidth() + spacing) - card.sprite:getWidth() / 2 + xAnchor, yAnchor - card.sprite:getHeight() - away)
+        end
+
+        local playerTotal, dealerTotal = CalculateBlackjackTotal()
+        DrawTextWithBackground((person == "player" and playerTotal or dealerTotal), xAnchor, yAnchor - Blackjack.cards[1].sprite:getHeight() - away - 40, Fonts.medium, {1,1,1}, {0,0,0})
     end
 end

@@ -201,6 +201,7 @@ function love.load()
         types = {
             ["Jack"] = {
                 width = 20, height = 20, color = { 176/255, 127/255, 63/255 },
+                wait = { current = 0, max = 30 },
                 voiceLines = {
                     greeting = {
                         "Hi! I'm Jack. Wanna play some blackjack?",
@@ -233,7 +234,7 @@ function love.load()
                         ["player bust"] = {
                             "You bust! I was rootin' for you...",
                             "You bust! Better luck next time, bub.",
-                            "You bust! You had the right idea.",
+                            "You bust! But you had the right idea, ha-ha.",
                         },
                         ["player spot-on"] = {
                             "You got 21 exactly! You oughta shoot the moon.",
@@ -262,27 +263,45 @@ function love.load()
                             "We tied! Well played.",
                             "Whoops, we tied! Had fun playin' with ya, bub.",
                         },
+                    },
+                    playAgain = {
+                        "Wanna play again?",
+                        "You got another one in ya?",
+                        "How about a rematch, bub?",
                     }
                 },
                 event = function (self, bub, bubIndex)
-                    if bub.phase == nil and Player.jumped then
-                        BubSays(lume.randomchoice(self.voiceLines.hitOrStay), bubIndex)
-                        BlackjackDeal(2, "player"); BlackjackDeal(2, "dealer")
-                        bub.phase = "waiting"
-                    elseif bub.phase == "waiting" and Player.netSpeed ~= 0 then
-                        local outcome
-                        if Player.xvelocity > 0 then
-                            BubSays(lume.randomchoice(self.voiceLines.stay), bubIndex) -- stay
-                            outcome = CheckBlackjackWinner()
-                        elseif Player.xvelocity < 0 then
-                            BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex) -- hit
-                            outcome = BlackjackDeal(1, "player")
-                        end
+                    if self.wait.current <= 0 then
+                        if bub.phase == nil and Player.jumped then
+                            Player.blackjackCards, Blackjack.dealerCards = {}, {}
+                            BubSays(lume.randomchoice(self.voiceLines.hitOrStay), bubIndex)
+                            BlackjackDeal(2, "player"); BlackjackDeal(2, "dealer")
+                            bub.phase = "waiting"
+                        elseif bub.phase == "waiting" and Player.netSpeed ~= 0 then
+                            local outcome
+                            local threshold = 3
+                            if Player.xvelocity > threshold then
+                                BubSays(lume.randomchoice(self.voiceLines.stay), bubIndex) -- stay
+                                outcome = CheckBlackjackWinner()
+                            elseif Player.xvelocity < -threshold then
+                                BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex) -- hit
+                                outcome = BlackjackDeal(1, "player")
+                                self.wait.current = self.wait.max
+                            end
 
-                        if outcome ~= nil then
-                            BubSays(lume.randomchoice(self.voiceLines.outcomes[outcome]), bubIndex) -- win or lose
+                            if outcome ~= nil then
+                                BubSays(lume.randomchoice(self.voiceLines.outcomes[outcome]), bubIndex) -- win or lose
+                                self.wait.current = self.wait.max
+                                bub.phase = "play again"
+                            end
+                        elseif bub.phase == "play again" and Player.netSpeed ~= 0 then
+                            BubSays(lume.randomchoice(self.voiceLines.playAgain), bubIndex)
+                            bub.phase = "request"
+                        elseif bub.phase == "request" and Player.jumped then
+                            bub.phase = nil
                         end
-                        bub.phase = "done"
+                    else
+                        self.wait.current = self.wait.current - 1 * GlobalDT
                     end
                 end
             }
@@ -817,6 +836,8 @@ function love.load()
     end
 
     if Settings.musicOn then Music:play() end
+
+    NewBub(Player.x, Player.y-10, "Jack")
 
     MessageWithPlayerStats()
 
