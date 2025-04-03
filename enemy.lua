@@ -24,12 +24,12 @@ function DrawEnemies()
             if enemy.seesPlayer and not Player.respawnWait.dead then
                 love.graphics.setColor(1,0,0,math.random()/2)
                 love.graphics.setLineWidth(3)
-                love.graphics.line(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+                love.graphics.line(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY)
             end
 
 
             local multiply = enemy.width / 6
-            local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+            local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY)
             local eyeX, eyeY = enemy.x + enemy.width / 2 + math.sin(angle) * multiply, enemy.y + enemy.width / 2 + math.cos(angle) * multiply
             local eyeWidth = enemy.width * 0.5
 
@@ -46,7 +46,7 @@ end
 function UpdateEnemies()
     for index, enemy in ipairs(Enemies) do
         if not enemy.dead then
-            local distance = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+            local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
 
             local before = enemy.seesPlayer
             enemy.seesPlayer = distance <= enemy.viewRadius
@@ -61,7 +61,7 @@ function UpdateEnemies()
             if distance <= Player.renderDistance then
                 if not Player.respawnWait.dead and not NextLevelAnimation.running then
                     if enemy.seesPlayer then
-                        local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2) + math.rad(Jitter(20))
+                        local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(Jitter(20))
                         enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * GlobalDT
                         enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * GlobalDT
                     end

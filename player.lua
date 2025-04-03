@@ -1,6 +1,6 @@
 function LoadPlayer()
     Player = {
-        x = 0, y = Boundary.y + Boundary.height,
+        x = 0, y = Boundary.y + Boundary.height, centerX = 0, centerY = 0,
         width = 10, height = 10, color = { 0,1,1 }, zoom = 0.4,
         baseSpeed = 0.35, speed = nil, netSpeed = 0, baseJumpStrength = 20, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
@@ -269,7 +269,7 @@ function DrawPlayer()
 
     --[[
     love.graphics.setColor(Player.color[1], Player.color[2], Player.color[3], .3)
-    local x, y = Player.x + Player.width / 2, Player.y + Player.height / 2
+    local x, y = Player.centerX, Player.centerY
     love.graphics.line(x, y, x + Player.xvelocity * 10, y + Player.yvelocity * 10)]]
 
     love.graphics.setColor(Player.color)
@@ -285,6 +285,34 @@ function DrawPlayer()
     -- temperature
     love.graphics.setColor(1,.5,0, Player.temperature.current / Player.temperature.max)
     love.graphics.rectangle("fill", Player.x, Player.y, Player.width, Player.height, ObjectGlobalData.cornerRadius, ObjectGlobalData.cornerRadius)
+
+    -- eye
+    local seeRadius = ToPixels(6)
+    local closestDistance = seeRadius
+    local toX, toY = Player.centerX - Player.xvelocity, Player.centerY - Player.yvelocity
+
+    for _, turret in ipairs(Turrets) do
+        local distance = Distance(Player.centerX, Player.centerY, turret.x, turret.y)
+        if distance < closestDistance then
+            closestDistance = distance
+            toX, toY = turret.x, turret.y
+        end
+    end
+    for _, enemy in ipairs(Enemies) do
+        local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+        if distance < closestDistance then
+            closestDistance = distance
+            toX, toY = enemy.x + enemy.width / 2, enemy.y + enemy.width / 2
+        end
+    end
+
+    local multiply = Player.width / 6
+    local angle = AngleBetween(toX, toY, Player.centerX, Player.centerY) + (closestDistance == seeRadius and 0 or math.rad(180))
+    local eyeX, eyeY = Player.centerX + math.sin(angle) * multiply, Player.centerY + math.cos(angle) * multiply
+    local eyeRadius = Player.width * 0.3
+
+    love.graphics.setColor(0,0,0)
+    love.graphics.circle("fill", eyeX, eyeY, eyeRadius)
 end
 
 function DoPlayerKeyPresses()
@@ -386,7 +414,7 @@ function DoPlayerCollisions(particlesOn)
             local closestDistance = math.huge
 
             if obj.playerTouchingSide == nil then
-                local playerCenter = { x = Player.x + Player.width / 2, y = Player.y + Player.height / 2 }
+                local playerCenter = { x = Player.centerX, y = Player.centerY }
 
                 local sides = {
                     { x = obj.x,             y = playerCenter.y     }, -- left
@@ -549,7 +577,7 @@ function DoPlayerGoalMagentismParticles()
     if ((not Descending.doingSo and Player.y <= maxDistance) or (Descending.doingSo and Player.y >= Boundary.y + Boundary.height - maxDistance)) and lume.randomchoice({true,false}) then
         local ratio = math.abs(Player.y / maxDistance)
 
-        table.insert(Particles, NewParticle(math.random(Player.x, Player.x + Player.width), Player.y + Player.height / 2, math.random(), Player.color, math.random() * ratio * 3 + 1, 180, (Descending.doingSo and 180 or 0), math.random(200, 400)))
+        table.insert(Particles, NewParticle(math.random(Player.x, Player.x + Player.width), Player.centerY, math.random(), Player.color, math.random() * ratio * 3 + 1, 180, (Descending.doingSo and 180 or 0), math.random(200, 400)))
     end
 end
 
@@ -631,7 +659,7 @@ end
 
 function CheckCollisionWithTurret()
     for _, turret in ipairs(Turrets) do
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, turret.x, turret.y) <= TurretGlobalData.headRadius + Player.width / 2 then
+        if Distance(Player.centerX, Player.centerY, turret.x, turret.y) <= TurretGlobalData.headRadius + Player.width / 2 then
             ExplodeTurret(turret)
 
             Player.xvelocity = -Player.xvelocity
@@ -684,7 +712,7 @@ function UpdatePlayerTemperature()
 end
 
 function DragPlayerTowards(x, y, strength)
-    local angle = AngleBetween(Player.x + Player.width / 2, Player.y + Player.height / 2, x, y)
+    local angle = AngleBetween(Player.centerX, Player.centerY, x, y)
 
     Player.xvelocity = Player.xvelocity + math.sin(angle) * strength
     Player.yvelocity = Player.yvelocity + math.cos(angle) * strength
@@ -715,7 +743,7 @@ function KillPlayer()
 
     PlayerSkill.deaths = PlayerSkill.deaths + 1
 
-    table.insert(DeathPositions, { x = Player.x + Player.width / 2, y = Player.y + Player.height / 2 })
+    table.insert(DeathPositions, { x = Player.centerX, y = Player.centerY })
 
     SaveData()
 
@@ -734,7 +762,7 @@ end
 
 function CheckCollisionWithBullets()
     for _, bullet in ipairs(Bullets) do
-        if Distance(bullet.x, bullet.y, Player.x + Player.width / 2, Player.y + Player.height / 2) <= Player.width / 2 + TurretGlobalData.bulletRadius then
+        if Distance(bullet.x, bullet.y, Player.centerX, Player.centerY) <= Player.width / 2 + TurretGlobalData.bulletRadius then
             KillPlayer()
         end
     end
@@ -883,8 +911,8 @@ function DrawPlayerAlignmentAxes()
     love.graphics.setLineWidth(2)
 
     local length = 2000
-    love.graphics.line(Player.x - length, Player.y + Player.height / 2, Player.x + length, Player.y + Player.height / 2)
-    love.graphics.line(Player.x + Player.width / 2, Player.y - length, Player.x + Player.width / 2, Player.y + length)
+    love.graphics.line(Player.x - length, Player.centerY, Player.x + length, Player.centerY)
+    love.graphics.line(Player.centerX, Player.y - length, Player.centerX, Player.y + length)
 end
 
 function CalculatePlayerSkill()
@@ -894,11 +922,11 @@ function CalculatePlayerSkill()
     return math.floor(skill * 10^decimalPoints) / 10^decimalPoints
 end
 function MessageWithPlayerStats()
-    NewMessage("Skill: " .. CalculatePlayerSkill(), Player.x + Player.width / 2, Player.y - 100, {1,0,0}, 300, Fonts.big)
+    NewMessage("Skill: " .. CalculatePlayerSkill(), Player.centerX, Player.y - 100, {1,0,0}, 300, Fonts.big)
 
     local index = 1
     for key, value in pairs(PlayerPerks) do
-        if value then NewMessage(key, Player.x + Player.width / 2, Player.y - 100 - index * (Fonts.medium:getHeight() + 10), {1,1,1}, 300, Fonts.medium) end
+        if value then NewMessage(key, Player.centerX, Player.y - 100 - index * (Fonts.medium:getHeight() + 10), {1,1,1}, 300, Fonts.medium) end
         index = index + 1
     end
 end
@@ -906,7 +934,7 @@ function CalculatePlayerGreatestBulletPresence()
     local maxDistance = 600
     local count = 0
     for _, bullet in ipairs(Bullets) do
-        if Distance(bullet.x, bullet.y, Player.x + Player.width / 2, Player.y + Player.height / 2) <= maxDistance then
+        if Distance(bullet.x, bullet.y, Player.centerX, Player.centerY) <= maxDistance then
             count = count + 1
         end
     end
@@ -1009,7 +1037,7 @@ function NewWayPoint(x, y)
 end
 function CheckCollisionWithWayPoint()
     for _, waypoint in ipairs(WayPoints) do
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, waypoint.x, waypoint.y) <= waypoint.radius * 4 then
+        if Distance(Player.centerX, Player.centerY, waypoint.x, waypoint.y) <= waypoint.radius * 4 then
             lume.remove(WayPoints, waypoint)
         end
     end
@@ -1026,7 +1054,7 @@ function DrawWayPointArrow()
     local closest
     local closestDistance = math.huge
     for _, waypoint in ipairs(WayPoints) do
-        local distance = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, waypoint.x, waypoint.y)
+        local distance = Distance(Player.centerX, Player.centerY, waypoint.x, waypoint.y)
         if distance < closestDistance then
             closestDistance = distance
             closest = waypoint
@@ -1037,9 +1065,9 @@ function DrawWayPointArrow()
 end
 
 function DrawArrowTowards(x, y, color, size, maxDistance)
-    local distance = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, x, y)
+    local distance = Distance(Player.centerX, Player.centerY, x, y)
     local ratio = Clamp(1 - distance / maxDistance, 0.1, 1)
-    local angle = AngleBetween(Player.x + Player.width / 2, Player.y + Player.height / 2, x, y)
+    local angle = AngleBetween(Player.centerX, Player.centerY, x, y)
     local points = {
         Player.x + math.sin(angle - math.rad(20 * size * ratio)) * 80, Player.y + math.cos(angle - math.rad(20 * size * ratio)) * 80,
         Player.x + math.sin(angle) * 100,               Player.y + math.cos(angle) * 100,
@@ -1061,7 +1089,7 @@ function GuardianAngelGlide()
     ((PlayerPerks["Power of the Achiever"] and Player.doubleJumpUsed) or (not PlayerPerks["Power of the Achiever"])) and not Player.coyote.running and not Player.standingOnObject then
         Player.yvelocity = Player.yvelocity / 2
 
-        table.insert(Particles, NewParticle(Player.x + Player.width / 2, Player.y + Player.height / 2, math.random() * 2 + 1, Player.color, math.random(), 0, 0.03, 100, function (self)
+        table.insert(Particles, NewParticle(Player.centerX, Player.centerY, math.random() * 2 + 1, Player.color, math.random(), 0, 0.03, 100, function (self)
             if self.speed > 0 then
                 self.speed = self.speed - 0.02 * GlobalDT
                 if self.speed <= 0 then
@@ -1127,5 +1155,5 @@ function PlayDialogue(index, event)
 end
 function DrawDialogue()
     if not Dialogue.playing.running then return end
-    DrawTextWithBackground(Dialogue.playing.text, Player.x + Player.width / 2, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
+    DrawTextWithBackground(Dialogue.playing.text, Player.centerX, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
 end

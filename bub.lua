@@ -1,13 +1,13 @@
 function NewBub(x, y, type)
     table.insert(Bubs, {
-        x = x, y = y, type = type
+        x = x, y = y, type = type, phase = nil,
     })
 end
 
 function UpdateBubs()
     for bubIndex, bub in ipairs(Bubs) do
-        local bubData = BubGlobalData[bub.type]
-        local distanceToPlayer = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, bub.x + bubData.width / 2, bub.y + bubData.height / 2)
+        local bubData = BubGlobalData.types[bub.type]
+        local distanceToPlayer = Distance(Player.centerX, Player.centerY, bub.x + bubData.width / 2, bub.y + bubData.height / 2)
 
         if distanceToPlayer > Player.renderDistance then goto continue end
 
@@ -18,9 +18,12 @@ function UpdateBubs()
                 Player.bubEngagementIndex = bubIndex
 
                 BubSays(lume.randomchoice(bubData.voiceLines.greeting), bubIndex)
+                Blackjack.playerPlaying = true
             else
-                bubData.event(bubData)
+                bubData.event(bubData, bub, bubIndex)
             end
+        elseif Blackjack.playerPlaying and bub.type == "Jack" then
+            Blackjack.playerPlaying = false
         end
 
         ::continue::
@@ -29,17 +32,17 @@ end
 
 function DrawBubs()
     for _, bub in ipairs(Bubs) do
-        local bubData = BubGlobalData[bub.type]
+        local bubData = BubGlobalData.types[bub.type]
         love.graphics.setColor(bubData.color)
-        love.graphics.rectangle("fill", bub.x, bub.y, bub.width, bub.height, BubGlobalData.edgeRounding, BubGlobalData.edgeRounding)
+        love.graphics.rectangle("fill", bub.x, bub.y, bubData.width, bubData.height, BubGlobalData.edgeRounding, BubGlobalData.edgeRounding)
 
-        local multiply = bub.width / 6
-        local angle = AngleBetween(bub.x + bub.width / 2, bub.y + bub.height / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
-        local eyeX, eyeY = bub.x + bub.width / 2 + math.sin(angle) * multiply, bub.y + bub.height / 2 + math.cos(angle) * multiply
-        local eyeRadius = bub.width * 0.3
+        local multiply = bubData.width / 6
+        local angle = AngleBetween(bub.x + bubData.width / 2, bub.y + bubData.height / 2, Player.centerX, Player.centerY)
+        local eyeX, eyeY = bub.x + bubData.width / 2 + math.sin(angle) * multiply, bub.y + bubData.height / 2 + math.cos(angle) * multiply
+        local eyeRadius = bubData.width * 0.3
 
         if not bub.seesPlayer then
-            eyeX, eyeY = bub.x + bub.width / 2, bub.y + bub.height / 2
+            eyeX, eyeY = bub.x + bubData.width / 2, bub.y + bubData.height / 2
         end
 
         love.graphics.setColor(0,0,0)
@@ -61,7 +64,78 @@ end
 function DrawBubDialogue()
     for _, bub in ipairs(Bubs) do
         if bub.says ~= nil then
-            DrawTextWithBackground(bub.says.text, bub.x, bub.y - BubGlobalData.dialogueSpacingFromBub, Fonts.medium, BubGlobalData[bub.type].color, {0,0,0})
+            DrawTextWithBackground(bub.says.text, bub.x, bub.y - BubGlobalData.dialogueSpacingFromBub, Fonts.medium, BubGlobalData.types[bub.type].color, {0,0,0})
         end
+    end
+end
+
+function ResetBlackjackDeck()
+    Blackjack.cards = {}
+    for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/blackjack")) do
+        if index == 1 then goto continue end
+        table.insert(Blackjack.cards, { sprite = love.graphics.newImage("assets/sprites/blackjack/" .. fileName, {dpiscale=10}), worth = tonumber(lume.split(lume.split(fileName, " ")[2], ".")[1]), suit = lume.split(fileName, " ")[1] })
+        ::continue::
+    end
+
+    --error(lume.serialize(Blackjack.cards))
+end
+function BlackjackDeal(numberOfCards, person)
+    if person == "player" then
+        if Player.blackjackCards == nil then
+            Player.blackjackCards = {}
+        end
+
+        for _ = 1, numberOfCards do
+            local card = lume.randomchoice(Blackjack.cards)
+            table.insert(Player.blackjackCards, card)
+            lume.remove(Blackjack.cards, card)
+        end
+    elseif person == "dealer" then
+        for _ = 1, numberOfCards do
+            local card = lume.randomchoice(Blackjack.cards)
+            table.insert(Blackjack.dealerCards, card)
+            lume.remove(Blackjack.cards, card)
+        end
+    end
+
+    return CheckBlackjackWinner()
+end
+function CheckBlackjackWinner()
+    local playerTotal, dealerTotal = CalculateBlackjackTotal()
+    if playerTotal > Blackjack.bust then
+        return "player bust"
+    elseif playerTotal == Blackjack.bust then
+        return "player spot-on"
+    elseif dealerTotal > Blackjack.bust then
+        return "dealer bust"
+    elseif dealerTotal == Blackjack.bust then
+        return "dealer spot-on"
+    elseif dealerTotal < playerTotal then
+        return "player higher total"
+    elseif dealerTotal > playerTotal then
+        return "dealer higher total"
+    elseif dealerTotal == playerTotal then
+        return "tie"
+    end
+end
+function CalculateBlackjackTotal()
+    local player = 0; for _, card in ipairs(Player.blackjackCards) do player = player + card.worth end
+    local dealer = 0; for _, card in ipairs(Blackjack.dealerCards) do dealer = dealer + card.worth end
+    return player, dealer
+end
+function DisplayBlackjackHand(person)
+    local cards, xAnchor, yAnchor
+    if person == "player" then cards, xAnchor, yAnchor = Player.blackjackCards, Player.centerX, Player.y
+    elseif person == "dealer" then cards, xAnchor, yAnchor = Blackjack.dealerCards, Bubs[Player.bubEngagementIndex].x + BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].width / 2, Bubs[Player.bubEngagementIndex].y
+    end
+
+    if cards == nil then
+        return
+    end
+
+    local spacing = 10
+    love.graphics.setColor(1,1,1)
+    for index, card in ipairs(cards) do
+        love.graphics.draw(card.sprite, (index - (#cards + 1) / 2) * (card.sprite:getWidth() + spacing) - card.sprite:getWidth() / 2 + xAnchor, yAnchor - card.sprite:getHeight() - 50)
     end
 end

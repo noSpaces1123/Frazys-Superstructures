@@ -5,8 +5,9 @@ function love.load()
     require "data_management"
     require "button"
     require "enemy"
+    require "bub"
 
-    love.window.setMode(100, 200, {highdpi=true})
+    love.window.updateMode(love.graphics.getWidth(), love.graphics.getHeight(), {highdpi=true, vsync=true})
     love.window.setTitle("Adam's Superstructures")
     love.window.setFullscreen(true)
 
@@ -196,10 +197,10 @@ function love.load()
     BubGlobalData = {
         noticeDistance = ToPixels(4),
         dialogueSpacingFromBub = 60,
-        edgeRounding = 10,
+        edgeRounding = 2,
         types = {
             ["Jack"] = {
-                width = 10, height = 10, color = { 176/255, 127/255, 63/255 },
+                width = 20, height = 20, color = { 176/255, 127/255, 63/255 },
                 voiceLines = {
                     greeting = {
                         "Hi! I'm Jack. Wanna play some blackjack?",
@@ -223,20 +224,66 @@ function love.load()
                         "Interesting choice.",
                         "I admire your caution.",
                     },
-                    win = {
-                        "Nice job, bub!",
-                        "Well played, bub!",
-                        "Masterfully executed.",
-                        "Well done!"
-                    },
-                    lose = {
-                        "Aww, I was rootin' for you...",
-                        "Better luck next time, bub.",
-                        "Well, you had the right idea.",
-                    },
+                    outcomes = {
+                        ["player higher total"] = {
+                            "You got the higher total! Nice job, bub!",
+                            "You got the higher total! Well played, bub!",
+                            "You got the higher total! Well done!"
+                        },
+                        ["player bust"] = {
+                            "You bust! I was rootin' for you...",
+                            "You bust! Better luck next time, bub.",
+                            "You bust! You had the right idea.",
+                        },
+                        ["player spot-on"] = {
+                            "You got 21 exactly! You oughta shoot the moon.",
+                            "You got 21 exactly! Lucky bastard!",
+                            "You got 21 exactly! Didn't think you were so good, bub!",
+                        },
+
+                        ["dealer higher total"] = {
+                            "I got the higher total! Good game.",
+                            "I got the higher total! I had fun.",
+                            "I got the higher total, ha-ha!"
+                        },
+                        ["dealer bust"] = {
+                            "I bust! Well done!",
+                            "I bust! Nicely done!",
+                            "I bust! Good play.",
+                        },
+                        ["dealer spot-on"] = {
+                            "I got 21 exactly! That's it for you, buddy.",
+                            "I got 21 exactly! I'm legit, I swear!",
+                            "I got 21 exactly! Good game.",
+                        },
+
+                        ["tie"] = {
+                            "Well would you look at that? We tied!",
+                            "We tied! Well played.",
+                            "Whoops, we tied! Had fun playin' with ya, bub.",
+                        },
+                    }
                 },
-                event = function (self)
-                    
+                event = function (self, bub, bubIndex)
+                    if bub.phase == nil and Player.jumped then
+                        BubSays(lume.randomchoice(self.voiceLines.hitOrStay), bubIndex)
+                        BlackjackDeal(2, "player"); BlackjackDeal(2, "dealer")
+                        bub.phase = "waiting"
+                    elseif bub.phase == "waiting" and Player.netSpeed ~= 0 then
+                        local outcome
+                        if Player.xvelocity > 0 then
+                            BubSays(lume.randomchoice(self.voiceLines.stay), bubIndex) -- stay
+                            outcome = CheckBlackjackWinner()
+                        elseif Player.xvelocity < 0 then
+                            BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex) -- hit
+                            outcome = BlackjackDeal(1, "player")
+                        end
+
+                        if outcome ~= nil then
+                            BubSays(lume.randomchoice(self.voiceLines.outcomes[outcome]), bubIndex) -- win or lose
+                        end
+                        bub.phase = "done"
+                    end
                 end
             }
         }
@@ -244,11 +291,10 @@ function love.load()
 
     PosterGlobalData = {
         spacingFromEdgesOfObject = 20,
-        density = 0.05, -- posters to generate = density x number of objects
+        density = 0.03, -- posters to generate = density x number of objects
     }
 
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
-    ObjectGenerationPalette = { normal = 20, icy = 9, death = 4, jump = 6, sticky = 3 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
         ["Will of the Frogman"] = 5,
@@ -260,6 +306,22 @@ function love.load()
         ["Wings of the Guardian Angel"] = 2,
         ["Essence of the Grasshopper"] = 3,
     }
+
+    ObjectGenerationPaletteAsNoiseConstraints = {
+        { type = "normal", weight = 20 },
+        { type = "icy", weight = 9 },
+        { type = "death", weight = 4 },
+        { type = "jump", weight = 6 },
+        { type = "sticky", weight = 3 },
+    }
+    local total = 0
+    local totalThusFar = 0
+    for _, value in ipairs(ObjectGenerationPaletteAsNoiseConstraints) do total = total + value.weight end
+    for _, value in ipairs(ObjectGenerationPaletteAsNoiseConstraints) do
+        local new = 1 / total * value.weight
+        value.max = new + totalThusFar
+        totalThusFar = totalThusFar + new
+    end
 
     ObjectTypeData = {
         normal = {
@@ -283,6 +345,14 @@ function love.load()
             height = { min = 200, max = 400 }
         },
     }
+
+    Blackjack = {
+        cards = {},
+        bust = 21,
+        dealerCards = {},
+        playerPlaying = false,
+    }
+    ResetBlackjackDeck()
 
     Messages = {}
 
@@ -834,7 +904,7 @@ function love.update(dt)
             if GameState == "game" then
                 UpdatePlayer()
                 UpdateShakeIntensity()
-                UpdateDangerPulseProgression()
+                --UpdateDangerPulseProgression()
                 UpdateCamLookAhead()
                 ExtendView()
 
@@ -850,9 +920,10 @@ function love.update(dt)
                         UpdateShrines()
                         UpdateMessages()
                         UpdateEnemies()
+                        UpdateBubs()
                         UpdateDialogue()
                         UpdateBubDialogue()
-                        DiscoverAndRenderObjects()
+                        DiscoverAndRenderDiscoverables()
                     end
 
                     UpdateHooligmanCutscene()
@@ -880,6 +951,8 @@ function love.update(dt)
             Particles = {}
         end
     end
+
+    Player.centerX, Player.centerY = Player.x + Player.width / 2, Player.y + Player.height / 2
 
     SaveFrames()
 end
@@ -932,7 +1005,13 @@ function love.draw()
             DrawHooligman()
             DrawHooligmanDialogue()
 
+            DrawBubs()
             DrawBubDialogue()
+
+            if Blackjack.playerPlaying then
+                DisplayBlackjackHand("player")
+                DisplayBlackjackHand("dealer")
+            end
 
             DrawCursorReadings()
             DrawDialogue()
@@ -1108,8 +1187,12 @@ function DrawObjects()
         if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
 
         if obj.poster ~= nil then
-            love.graphics.setColor(1,1,1)
-            love.graphics.draw(Sprites.posters[obj.poster.type], obj.x + obj.poster.x, obj.y + PosterGlobalData.spacingFromEdgesOfObject)
+            if Sprites.posters[obj.poster.type] == nil then
+                obj.poster = nil
+            else
+                love.graphics.setColor(1,1,1)
+                love.graphics.draw(Sprites.posters[obj.poster.type], obj.x + obj.poster.x, obj.y + PosterGlobalData.spacingFromEdgesOfObject)
+            end
         end
 
         ::continue::
@@ -1142,7 +1225,9 @@ function GenerateObjects()
 
     math.randomseed(Seed)
     for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
-        local objectType = lume.weightedchoice(ObjectGenerationPalette)
+        local x, y = math.random(Boundary.x, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height)
+
+        local objectType = GetObjectTypeFromPerlinNoise(x, y)
 
         local width, height = math.random(ObjectTypeData[objectType].width.min, ObjectTypeData[objectType].width.max), math.random(ObjectTypeData[objectType].height.min, ObjectTypeData[objectType].height.max)
         if math.random() < .05 then
@@ -1152,7 +1237,7 @@ function GenerateObjects()
         end
 
         table.insert(Objects, {
-            x = math.random(Boundary.x, Boundary.x + Boundary.width), y = math.random(Boundary.y, Boundary.y + Boundary.height),
+            x = x, y = y,
             width = width, height = height, type = objectType
         })
     end
@@ -1183,7 +1268,20 @@ function GenerateObjects()
     SpawnEnemies()
     GenerateBG()
 end
-function DiscoverAndRenderObjects()
+function GetObjectTypeFromPerlinNoise(x, y)
+    local totalObjectTypes = 0; for _, _ in pairs(ObjectTypeData) do totalObjectTypes = totalObjectTypes + 1 end
+    local xyDivisor = 13000
+    local noiseValue = Clamp(love.math.noise(x / xyDivisor, y / xyDivisor) + Jitter(0.1), 0, 1)
+
+    for index, value in ipairs(ObjectGenerationPaletteAsNoiseConstraints) do
+        local lastobj = ObjectGenerationPaletteAsNoiseConstraints[index-1]
+        local lastMax = (lastobj and lastobj.max or 0)
+        if noiseValue >= lastMax and noiseValue <= value.max then
+            return value.type
+        end
+    end
+end
+function DiscoverAndRenderDiscoverables()
     for _, obj in ipairs(Objects) do
         love.graphics.push()
         InitialiseRegularCoordinateAlterations()
@@ -1200,6 +1298,38 @@ function DiscoverAndRenderObjects()
             obj.render = true
         else
             obj.render = false
+        end
+    end
+
+    for _, turret in ipairs(Turrets) do
+        love.graphics.push()
+        InitialiseRegularCoordinateAlterations()
+        local turretX, turretY = love.graphics.transformPoint(turret.x - TurretGlobalData.headRadius, turret.y - TurretGlobalData.headRadius)
+        love.graphics.pop()
+
+        love.graphics.push()
+        if love.keyboard.isDown("lshift") then ApplyCamLookAhead() end
+        local screenX, screenY = love.graphics.inverseTransformPoint(0, 0)
+        love.graphics.pop()
+
+        if Touching(turretX, turretY, TurretGlobalData.headRadius*2, TurretGlobalData.headRadius*2, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
+            turret.discovered = true
+        end
+    end
+
+    for _, enemy in ipairs(Enemies) do
+        love.graphics.push()
+        InitialiseRegularCoordinateAlterations()
+        local turretX, turretY = love.graphics.transformPoint(enemy.x, enemy.y)
+        love.graphics.pop()
+
+        love.graphics.push()
+        if love.keyboard.isDown("lshift") then ApplyCamLookAhead() end
+        local screenX, screenY = love.graphics.inverseTransformPoint(0, 0)
+        love.graphics.pop()
+
+        if Touching(turretX, turretY, enemy.width, enemy.width, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
+            enemy.discovered = true
         end
     end
 end
@@ -1282,7 +1412,7 @@ function CorrectBoundaryHeight()
     Boundary.height = Boundary.baseHeight + math.floor(Level / 10) * Boundary.heightIncrement
 end
 function CorrectTurretDensity()
-    ObjectGlobalData.turretDensity = ObjectGlobalData.baseTurretDensity + (Level - 1) * 0.00000002
+    ObjectGlobalData.turretDensity = ObjectGlobalData.baseTurretDensity + (Level - 1) * 0.000000016
 end
 function CorrectEnemyDensity()
     EnemyGlobalData.enemyDensity = EnemyGlobalData.baseEnemyDensity + (Level - 1) * 0.00000001
@@ -1429,7 +1559,7 @@ function PlayHooligmanDialogue(text)
 end
 function DrawHooligmanDialogue()
     if not Descending.hooligmanCutscene.dialogue.running then return end
-    DrawTextWithBackground(Descending.hooligmanCutscene.dialogue.text, Player.x + Player.width / 2, Player.y + 120, Fonts.dialogue, {1,0,0}, {0,0,0})
+    DrawTextWithBackground(Descending.hooligmanCutscene.dialogue.text, Player.centerX, Player.y + 120, Fonts.dialogue, {1,0,0}, {0,0,0})
 end
 function DrawHooligman()
     if not Descending.hooligmanCutscene.running then return end
@@ -1443,7 +1573,7 @@ function DrawHooligman()
 
 
     local multiply = width / 6
-    local angle = AngleBetween(x + width / 2, y + width / 2, Player.x + Player.width / 2, Player.y + Player.height / 2)
+    local angle = AngleBetween(x + width / 2, y + width / 2, Player.centerX, Player.centerY)
     local eyeX, eyeY = x + width / 2 + math.sin(angle) * multiply + Jitter(1), y + width / 2 + math.cos(angle) * multiply + Jitter(1)
     local eyeWidth = width * 0.5
 
@@ -1627,7 +1757,7 @@ function UpdateTurrets()
     TurretGlobalData.threatUpdateInterval.current = TurretGlobalData.threatUpdateInterval.current + 1 * GlobalDT
 
     for turretIndex, turret in ipairs(Turrets) do
-        local distance = Distance(turret.x, turret.y, Player.x + Player.width / 2, Player.y + Player.height / 2)
+        local distance = Distance(turret.x, turret.y, Player.centerX, Player.centerY)
 
         local before = turret.seesPlayer
         turret.seesPlayer = distance <= turret.viewRadius
@@ -1639,7 +1769,7 @@ function UpdateTurrets()
                 PlaySFX(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
             end
 
-            turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.x + Player.width / 2, Player.y + Player.height / 2))
+            turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
             turret.objectiveSearchingAngle = turret.searchingAngle
 
             local angle = AngleBetween(turret.x, turret.y, Player.x, Player.y) + math.rad(math.random(turret.inaccuracy) * (lume.randomchoice({true,false}) and 1 or -1))
@@ -1716,6 +1846,7 @@ end
 function DrawTurrets()
     for _, turret in ipairs(Turrets) do
         if turret.notMinimapVisible and Minimap.showing and GameState == "game" then goto continue end
+        if not turret.discovered then goto continue end
 
         if turret.type == "normal" then
             love.graphics.setColor(0,.3,1)
@@ -1743,7 +1874,7 @@ function DrawTurrets()
             local r, g, b = love.graphics.getColor()
             love.graphics.setColor(r, g, b, turret.fireRate.current / turret.fireRate.max)
 
-            love.graphics.line(turret.x, turret.y, Player.x + Player.width / 2 + (math.random()-math.random()) * 3, Player.y + Player.height / 2 + (math.random()-math.random()) * 3)
+            love.graphics.line(turret.x, turret.y, Player.centerX + (math.random()-math.random()) * 3, Player.centerY + (math.random()-math.random()) * 3)
         else
             local x2 = math.sin(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.x
             local y2 = math.cos(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.y
@@ -1779,7 +1910,7 @@ function ExplodeTurret(turret)
 end
 function IdentifyIfTurretIsAThreat(turret)
     if turret.fireRate.max <= Lerp(TurretGlobalData.fireInterval.min, TurretGlobalData.fireInterval.max, 1/4) and
-    ToMeters(Distance(turret.x, turret.y, Player.x + Player.width / 2, Player.y + Player.height / 2)) <= 5 then
+    ToMeters(Distance(turret.x, turret.y, Player.centerX, Player.centerY)) <= 5 then
         return true
     end
 
@@ -1917,7 +2048,7 @@ function DrawShines()
 
         ::continue::
 
-        if AnalyticsUpgrades["signal radar"] and Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
+        if AnalyticsUpgrades["signal radar"] and Distance(Player.centerX, Player.centerY, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
             DrawArrowTowards(shrine.x, shrine.y, color, 1, ShrineGlobalData.maxHintDistance)
         end
     end
@@ -1976,7 +2107,7 @@ function FireBullet(x, y, angle, speed, originTurretIndex)
 
             local maxdistance, checks = 1300, 20
             for i = 0, maxdistance, maxdistance / checks do
-                if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2,
+                if Distance(Player.centerX, Player.centerY,
                 self.x + math.sin(angle) * i, self.y + math.cos(angle) * i) <= Player.width / 2 + self.radius + maxdistance/checks * 2 then
                     self.warningProgression = self.warningProgression + .1 * GlobalDT
                     if self.warningProgression > 1 then
@@ -1994,7 +2125,7 @@ function FireBullet(x, y, angle, speed, originTurretIndex)
             love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression), 100)
         end,
         update = function (self)
-            local distanceToPlayer = Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, self.x, self.y)
+            local distanceToPlayer = Distance(Player.centerX, Player.centerY, self.x, self.y)
             local multiplier = Lerp(0.3, 1, Clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
 
             self.x = self.x + math.sin(angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
@@ -2046,7 +2177,7 @@ end
 
 function DrawBG()
     for _, element in ipairs(BG) do
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, element.x, element.y) <= Player.renderDistance then
+        if Distance(Player.centerX, Player.centerY, element.x, element.y) <= Player.renderDistance then
             love.graphics.setColor(1,1,1, element.alpha)
             love.graphics.circle("fill", element.x, element.y, element.radius)
         end
@@ -2403,12 +2534,12 @@ function ApplyUpgrades()
 
     local index = 1
     for _, value in ipairs(Upgrades[4].list) do
+        if index > PlayerUpgrades["analytics"] then break end
         AnalyticsUpgrades[value] = true
         index = index + 1
-        if index >= PlayerUpgrades["analytics"] then break end
     end
 
-    for i = 1, PlayerUpgrades["suit"] do
+    for i = 1, PlayerUpgrades["suit"] + 1 do
         SuitUpgrades[i]()
     end
 end
@@ -2473,13 +2604,18 @@ end
 function Print(text)
     table.insert(CommandLine.history, "> " .. text)
 end
+function DEBUG()
+    Enemies = {}
+    Turrets = {}
+    Player.jumpStrength = 40
+end
 
 function DrawDebug()
     if not Debug then return end
 
     local enemiesRendered = 0
     for _, enemy in ipairs(Enemies) do
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2) <= Player.renderDistance then
+        if Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2) <= Player.renderDistance then
             enemiesRendered = enemiesRendered + 1
         end
     end
@@ -2493,7 +2629,7 @@ function DrawDebug()
 
     local turretsRendered = 0
     for _, turret in ipairs(Turrets) do
-        if Distance(Player.x + Player.width / 2, Player.y + Player.height / 2, turret.x, turret.y) <= Player.renderDistance then
+        if Distance(Player.centerX, Player.centerY, turret.x, turret.y) <= Player.renderDistance then
             turretsRendered = turretsRendered + 1
         end
     end
@@ -2510,7 +2646,7 @@ function DrawDebug()
 end
 
 function SaveFrames()
-    if love.timer.getAverageDelta() > 0.07 then
+    if love.timer.getAverageDelta() > 0.07 and false then
         SaveData()
         LoadData()
     end
