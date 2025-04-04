@@ -18,12 +18,13 @@ function UpdateBubs()
                 Player.bubEngagementIndex = bubIndex
 
                 BubSays(lume.randomchoice(bubData.voiceLines.greeting), bubIndex)
-                Blackjack.playerPlaying = true
             else
-                bubData.event(bubData, bub, bubIndex)
+                bubData.event(bubData, bub, Player.bubEngagementIndex, nil)
             end
-        elseif Blackjack.playerPlaying and bub.type == "Jack" then
-            Blackjack.playerPlaying = false
+        else
+            bub.says = nil
+            if Blackjack.playerPlaying then Blackjack.playerPlaying = false end
+            if Player.bubEngagementIndex == bubIndex then Player.bubEngagementIndex = nil end
         end
 
         ::continue::
@@ -31,10 +32,16 @@ function UpdateBubs()
 end
 
 function DrawBubs()
-    for _, bub in ipairs(Bubs) do
+    for bubIndex, bub in ipairs(Bubs) do
         local bubData = BubGlobalData.types[bub.type]
         love.graphics.setColor(bubData.color)
         love.graphics.rectangle("fill", bub.x, bub.y, bubData.width, bubData.height, BubGlobalData.edgeRounding, BubGlobalData.edgeRounding)
+
+        if Player.bubEngagementIndex == bubIndex then
+            love.graphics.setLineWidth(math.random(3,4))
+            love.graphics.setColor(bubData.color[1], bubData.color[2], bubData.color[3], 0.2)
+            love.graphics.circle("line", bub.x + bubData.width / 2, bub.y + bubData.height / 2, BubGlobalData.noticeDistance)
+        end
 
         local multiply = bubData.width / 6
         local angle = AngleBetween(bub.x + bubData.width / 2, bub.y + bubData.height / 2, Player.centerX, Player.centerY)
@@ -52,6 +59,7 @@ end
 
 function BubSays(text, bubIndex)
     Bubs[bubIndex].says = { text = text, duration = 1000 }
+    PlaySFX(SFX.bubSpeak, 0.6, math.random()/10+.95)
 end
 function UpdateBubDialogue()
     for _, bub in ipairs(Bubs) do
@@ -102,30 +110,69 @@ function BlackjackDeal(numberOfCards, person)
 end
 function CheckBlackjackWinner(hit)
     local playerTotal, dealerTotal = CalculateBlackjackTotal()
+
     if playerTotal > Blackjack.bust then
+        Blackjack.winner = "dealer"
         return "player bust"
+
     elseif playerTotal == Blackjack.bust then
+        Blackjack.winner = "player"
         return "player spot-on"
+
     elseif dealerTotal > Blackjack.bust then
+        Blackjack.winner = "player"
         return "dealer bust"
+
     elseif dealerTotal == Blackjack.bust then
+        Blackjack.winner = "dealer"
         return "dealer spot-on"
+
     elseif dealerTotal < playerTotal and not hit then
+        Blackjack.winner = "player"
         return "player higher total"
+
     elseif dealerTotal > playerTotal and not hit then
+        Blackjack.winner = "dealer"
         return "dealer higher total"
+
     elseif dealerTotal == playerTotal and not hit then
+        Blackjack.winner = "neither"
         return "tie"
+
     end
 end
-function CalculateBlackjackTotal()
-    local player = 0; if Player.blackjackCards ~= nil then for _, card in ipairs(Player.blackjackCards) do player = player + card.worth end end
-    local dealer = 0; for index, card in ipairs(Blackjack.dealerCards) do if not (index == 2 and Bubs[Player.bubEngagementIndex].phase ~= "play again") then dealer = dealer + card.worth end end
-    return player, dealer
+function CalculateBlackjackTotal(forDisplay)
+    local playerTotal, playerAces = 0, 0
+    if Player.blackjackCards ~= nil then
+        for _, card in ipairs(Player.blackjackCards) do
+            if card.worth == 1 then playerAces = playerAces + 1 end
+            playerTotal = playerTotal + card.worth
+        end
+    end
+    for _ = 1, playerAces do
+        if playerTotal + 10 <= Blackjack.bust then
+            playerTotal = playerTotal + 10
+        end
+    end
+
+    local dealerTotal, dealerAces = 0, 0
+    for index, card in ipairs(Blackjack.dealerCards) do
+        if not (index == 2 and Bubs[Player.bubEngagementIndex].phase ~= "play again" and forDisplay) then
+            if card.worth == 1 then dealerAces = dealerAces + 1 end
+            dealerTotal = dealerTotal + card.worth
+        end
+    end
+    for _ = 1, dealerAces do
+        if dealerTotal + 10 <= Blackjack.bust then
+            dealerTotal = dealerTotal + 10
+        end
+    end
+
+    return playerTotal, dealerTotal
 end
 function DisplayBlackjackHand(person)
     local bub = Bubs[Player.bubEngagementIndex]
-    if bub.phase == "waiting" or bub.phase == "play again" then
+    if bub.phase == "player" or bub.phase == "play again" or bub.phase == "dealer's choice" then
         local cards, xAnchor, yAnchor
         if person == "player" then cards, xAnchor, yAnchor = Player.blackjackCards, Player.centerX, Player.y
         elseif person == "dealer" then cards, xAnchor, yAnchor = Blackjack.dealerCards, bub.x + BubGlobalData.types[bub.type].width / 2, bub.y
@@ -137,11 +184,48 @@ function DisplayBlackjackHand(person)
         local away = 100
         love.graphics.setColor(1,1,1)
         for index, card in ipairs(cards) do
-            local sprite = ((person == "dealer" and index == 2 and bub.phase ~= "play again") and Blackjack.unknownSprite or card.sprite)
+            local sprite = ((person == "dealer" and index == 2 and bub.phase ~= "play again" and bub.phase ~= "dealer's choice") and Blackjack.unknownSprite or card.sprite)
             love.graphics.draw(sprite, (index - (#cards + 1) / 2) * (card.sprite:getWidth() + spacing) - card.sprite:getWidth() / 2 + xAnchor, yAnchor - card.sprite:getHeight() - away)
         end
 
-        local playerTotal, dealerTotal = CalculateBlackjackTotal()
+        local playerTotal, dealerTotal = CalculateBlackjackTotal(true)
         DrawTextWithBackground((person == "player" and playerTotal or dealerTotal), xAnchor, yAnchor - Blackjack.cards[1].sprite:getHeight() - away - 40, Fonts.medium, {1,1,1}, {0,0,0})
     end
+end
+function InitialiseBlackjackButtons()
+    local spacing, width, height = 20, 200, 40
+    NewButton("Hit", love.graphics.getWidth() / 2 - spacing / 2 - width, love.graphics.getHeight() - spacing - height, width, height, {1,0,0}, {0,0,0}, {.2,0,0}, {1,0,0}, Fonts.normal, 0, 10,10, function (self)
+        local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
+        bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "hit")
+    end, nil, function (self)
+        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].phase == "player" and Blackjack.playerPlaying and BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].wait.current <= 0
+    end)
+    NewButton("Stay", love.graphics.getWidth() / 2 + spacing / 2, love.graphics.getHeight() - spacing - height, width, height, {0,1,1}, {0,0,0}, {0,.2,.2}, {0,1,1}, Fonts.normal, 0, 10,10, function (self)
+        local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
+        bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "stay")
+    end, nil, function (self)
+        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].phase == "player" and Blackjack.playerPlaying and BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].wait.current <= 0
+    end)
+
+    NewButton("Hell yeah.", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, {0,1,0}, {0,0,0}, {0,.2,0}, {0,1,0}, Fonts.normal, 2, 10,10, function (self)
+        local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
+        bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "play")
+    end, nil, function (self)
+        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and (not Blackjack.playerPlaying or Bubs[Player.bubEngagementIndex].phase == "request")
+    end)
+
+    NewButton("Okay", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1}, Fonts.normal, 2, 10,10, function (self)
+        local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
+        bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "acknowledged")
+    end, function (self)
+        if Blackjack.winner == "player" then
+            self.text = "Yay!"
+        elseif Blackjack.winner == "dealer" then
+            self.text = "Okay"
+        elseif Blackjack.winner == "neither" then
+            self.text = "Huh!"
+        end
+    end, function (self)
+        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and Bubs[Player.bubEngagementIndex].phase == "play again"
+    end)
 end

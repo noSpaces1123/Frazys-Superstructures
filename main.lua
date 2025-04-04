@@ -42,6 +42,10 @@ function love.load()
         unstick = love.audio.newSource("assets/sfx/unstick.wav", "static"),
         upgrade = love.audio.newSource("assets/sfx/upgrade.wav", "static"),
         upgradeMenu = love.audio.newSource("assets/sfx/upgrade menu.wav", "static"),
+        bubSpeak = love.audio.newSource("assets/sfx/bub speak.wav", "static"),
+        drawCard = love.audio.newSource("assets/sfx/draw card.wav", "static"),
+        bust = love.audio.newSource("assets/sfx/bust.wav", "static"),
+        blackjackSpotOn = love.audio.newSource("assets/sfx/blackjack spot-on.wav", "static"),
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
@@ -211,7 +215,10 @@ function love.load()
                         "Hey! My name's Jack and I sure love me some blackjack. Wanna play?",
                     },
                     hitOrStay = {
-                        "Move left to hit, right to stay.",
+                        "What'll it be?",
+                        "Make your choice.",
+                        "Take your time!",
+                        "You got this, bub.",
                     },
                     hit = {
                         "I like your style, bub.",
@@ -220,42 +227,46 @@ function love.load()
                         "Let's hope this goes well.",
                     },
                     stay = {
-                        "Playing it safe, hmm?",
-                        "You do you.",
-                        "Interesting choice.",
-                        "I admire your caution.",
+                        "Hmmm...",
                     },
                     outcomes = {
                         ["player higher total"] = {
                             "You got the higher total! Nice job, bub!",
                             "You got the higher total! Well played, bub!",
-                            "You got the higher total! Well done!"
+                            "You got the higher total! Well done!",
+                            "You got the higher total, smarty pants!",
                         },
                         ["player bust"] = {
-                            "You bust! I was rootin' for you...",
-                            "You bust! Better luck next time, bub.",
-                            "You bust! But you had the right idea, ha-ha.",
+                            "You're bust! I was rootin' for you...",
+                            "You're bust! Better luck next time, bub.",
+                            "You're bust! But you had the right idea, ha-ha.",
+                            "You're bust! Practice makes perfect.",
                         },
                         ["player spot-on"] = {
-                            "You got 21 exactly! You oughta shoot the moon.",
+                            "You got 21 exactly! Didn't know I was playing a pro!.",
                             "You got 21 exactly! Lucky bastard!",
                             "You got 21 exactly! Didn't think you were so good, bub!",
+                            "You got 21 exactly! Excellent performance!",
                         },
 
                         ["dealer higher total"] = {
                             "I got the higher total! Good game.",
                             "I got the higher total! I had fun.",
-                            "I got the higher total, ha-ha!"
+                            "I got the higher total, ha-ha!",
+                            "I got the higher total! How thrilling.",
                         },
                         ["dealer bust"] = {
-                            "I bust! Well done!",
-                            "I bust! Nicely done!",
-                            "I bust! Good play.",
+                            "I'm bust! Well done!",
+                            "I'm bust! Nicely done!",
+                            "I'm bust! Good play.",
+                            "Whoopsie, I'm bust!",
                         },
                         ["dealer spot-on"] = {
                             "I got 21 exactly! That's it for you, buddy.",
                             "I got 21 exactly! I'm legit, I swear!",
                             "I got 21 exactly! Good game.",
+                            "I got 21 exactly! Exhilarating!",
+                            "I got 21 exactly! Gonna tell my mom about this one.",
                         },
 
                         ["tie"] = {
@@ -270,35 +281,65 @@ function love.load()
                         "How about a rematch, bub?",
                     }
                 },
-                event = function (self, bub, bubIndex)
+                event = function (self, bub, bubIndex, event)
                     if self.wait.current <= 0 then
-                        if bub.phase == nil and Player.jumped then
+                        if event == "play" then
                             Player.blackjackCards, Blackjack.dealerCards = {}, {}
                             BubSays(lume.randomchoice(self.voiceLines.hitOrStay), bubIndex)
+                            ResetBlackjackDeck()
                             BlackjackDeal(2, "player"); BlackjackDeal(2, "dealer")
-                            bub.phase = "waiting"
-                        elseif bub.phase == "waiting" and Player.netSpeed ~= 0 then
+                            PlaySFX(SFX.drawCard, 0.2, 1)
+                            bub.phase = "player"
+                            Blackjack.playerPlaying = true
+                        elseif event == "hit" then
+                            BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex)
+                            local outcome = BlackjackDeal(1, "player")
+                            self.wait.current = 30
+                            PlaySFX(SFX.drawCard, 0.2, 1 + (#Player.blackjackCards - 2) / 8)
+
+                            if outcome == "player bust" or outcome == "player spot-on" then
+                                self.wait.current = 30
+                                bub.phase = "play again"
+                                BubSays(lume.randomchoice(self.voiceLines.outcomes[CheckBlackjackWinner(true)]), bubIndex) -- player wins or loses
+
+                                if outcome == "player bust" then
+                                    PlaySFX(SFX.bust, 0.2, 1)
+                                else
+                                    PlaySFX(SFX.blackjackSpotOn, 0.2, 1)
+                                end
+                            end
+                        elseif event == "stay" then
+                            BubSays(lume.randomchoice(self.voiceLines.stay), bubIndex)
+                            local outcome = CheckBlackjackWinner(true)
+                            self.wait.current = 50
+                            bub.phase = "dealer's choice"
+
+                            if outcome == "player spot-on" then
+                                self.wait.current = 30
+                                bub.phase = "play again"
+                                BubSays(lume.randomchoice(self.voiceLines.outcomes[CheckBlackjackWinner(true)]), bubIndex)
+                                PlaySFX(SFX.blackjackSpotOn, 0.2, 1)
+                            end
+                        elseif bub.phase == "dealer's choice" then
                             local outcome
-                            local threshold = 3
-                            if Player.xvelocity > threshold then
-                                BubSays(lume.randomchoice(self.voiceLines.stay), bubIndex) -- stay
+                            local _, dealerTotal = CalculateBlackjackTotal()
+                            if dealerTotal <= 16 then
+                                BlackjackDeal(1, "dealer")
+                                outcome = CheckBlackjackWinner(true)
+                                self.wait.current = 50
+                                if outcome == "dealer bust" then PlaySFX(SFX.bust, 0.2, 1) end
+                            else
                                 outcome = CheckBlackjackWinner()
-                            elseif Player.xvelocity < -threshold then
-                                BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex) -- hit
-                                outcome = BlackjackDeal(1, "player")
-                                self.wait.current = self.wait.max
                             end
 
                             if outcome ~= nil then
                                 BubSays(lume.randomchoice(self.voiceLines.outcomes[outcome]), bubIndex) -- win or lose
-                                self.wait.current = self.wait.max
+                                self.wait.current = 40
                                 bub.phase = "play again"
                             end
-                        elseif bub.phase == "play again" and Player.netSpeed ~= 0 then
+                        elseif bub.phase == "play again" and event == "acknowledged" then
                             BubSays(lume.randomchoice(self.voiceLines.playAgain), bubIndex)
                             bub.phase = "request"
-                        elseif bub.phase == "request" and Player.jumped then
-                            bub.phase = nil
                         end
                     else
                         self.wait.current = self.wait.current - 1 * GlobalDT
@@ -825,6 +866,7 @@ function love.load()
 
     Buttons = {}
     InitialiseButtons()
+    InitialiseBlackjackButtons()
 
     InitialiseUpgrades()
 
@@ -837,7 +879,7 @@ function love.load()
 
     if Settings.musicOn then Music:play() end
 
-    NewBub(Player.x, Player.y-10, "Jack")
+    --NewBub(Player.x, Player.y-10, "Jack")
 
     MessageWithPlayerStats()
 
@@ -1789,6 +1831,8 @@ function UpdateTurrets()
             if not before and turret.seesPlayer then
                 PlaySFX(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
             end
+
+            Player.targeted = true
 
             turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
             turret.objectiveSearchingAngle = turret.searchingAngle
