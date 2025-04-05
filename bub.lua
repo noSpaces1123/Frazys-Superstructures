@@ -4,6 +4,35 @@ function NewBub(x, y, type)
     })
 end
 
+function SpawnBubs()
+    Bubs = {}
+
+    local categories = {}
+    for key, _ in pairs(BubGlobalData.types) do
+        table.insert(categories, key)
+    end
+
+    local objWidth = 400
+
+    for _ = 1, Boundary.width * Boundary.height * ObjectGlobalData.bubDensity do
+        local x, y = math.random(Boundary.x, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height)
+        local bubType = categories[math.random(#categories)]
+        local bubData = BubGlobalData.types[bubType]
+        NewBub(x, y, bubType)
+
+        for _, obj in ipairs(Objects) do
+            if Touching(obj.x, obj.y, obj.width, obj.height, x, y, bubData.width, bubData.height) then
+                lume.remove(Objects, obj)
+            end
+        end
+
+        -- platform under the bub
+        table.insert(Objects, {
+            x = x + bubData.width / 2 - objWidth / 2, y = y + bubData.height, width = objWidth, height = 80, type = "normal"
+        })
+    end
+end
+
 function UpdateBubs()
     for bubIndex, bub in ipairs(Bubs) do
         local bubData = BubGlobalData.types[bub.type]
@@ -33,27 +62,34 @@ end
 
 function DrawBubs()
     for bubIndex, bub in ipairs(Bubs) do
+        local distance = Distance(bub.x, bub.y, Player.centerX, Player.centerY)
         local bubData = BubGlobalData.types[bub.type]
-        love.graphics.setColor(bubData.color)
-        love.graphics.rectangle("fill", bub.x, bub.y, bubData.width, bubData.height, BubGlobalData.edgeRounding, BubGlobalData.edgeRounding)
+        if distance <= Player.renderDistance then
+            love.graphics.setColor(bubData.color)
+            love.graphics.rectangle("fill", bub.x, bub.y, bubData.width, bubData.height, BubGlobalData.edgeRounding, BubGlobalData.edgeRounding)
 
-        if Player.bubEngagementIndex == bubIndex then
-            love.graphics.setLineWidth(math.random(3,4))
-            love.graphics.setColor(bubData.color[1], bubData.color[2], bubData.color[3], 0.2)
-            love.graphics.circle("line", bub.x + bubData.width / 2, bub.y + bubData.height / 2, BubGlobalData.noticeDistance)
+            if Player.bubEngagementIndex == bubIndex then
+                love.graphics.setLineWidth(math.random(3,4))
+                love.graphics.setColor(bubData.color[1], bubData.color[2], bubData.color[3], 0.2)
+                love.graphics.circle("line", bub.x + bubData.width / 2, bub.y + bubData.height / 2, BubGlobalData.noticeDistance)
+            end
+
+            local multiply = bubData.width / 6
+            local angle = AngleBetween(bub.x + bubData.width / 2, bub.y + bubData.height / 2, Player.centerX, Player.centerY)
+            local eyeX, eyeY = bub.x + bubData.width / 2 + math.sin(angle) * multiply, bub.y + bubData.height / 2 + math.cos(angle) * multiply
+            local eyeRadius = bubData.width * 0.3
+
+            if not bub.seesPlayer then
+                eyeX, eyeY = bub.x + bubData.width / 2, bub.y + bubData.height / 2
+            end
+
+            love.graphics.setColor(0,0,0)
+            love.graphics.circle("fill", eyeX, eyeY, eyeRadius, 100)
         end
 
-        local multiply = bubData.width / 6
-        local angle = AngleBetween(bub.x + bubData.width / 2, bub.y + bubData.height / 2, Player.centerX, Player.centerY)
-        local eyeX, eyeY = bub.x + bubData.width / 2 + math.sin(angle) * multiply, bub.y + bubData.height / 2 + math.cos(angle) * multiply
-        local eyeRadius = bubData.width * 0.3
-
-        if not bub.seesPlayer then
-            eyeX, eyeY = bub.x + bubData.width / 2, bub.y + bubData.height / 2
+        if AnalyticsUpgrades["signal radar"] and distance <= BubGlobalData.maxHintDistance and distance > BubGlobalData.noticeDistance then
+            DrawArrowTowards(bub.x + bubData.width / 2, bub.y + bubData.height / 2, bubData.color, 0.6, BubGlobalData.maxHintDistance)
         end
-
-        love.graphics.setColor(0,0,0)
-        love.graphics.circle("fill", eyeX, eyeY, eyeRadius, 100)
     end
 end
 
@@ -189,7 +225,16 @@ function DisplayBlackjackHand(person)
         end
 
         local playerTotal, dealerTotal = CalculateBlackjackTotal(true)
-        DrawTextWithBackground((person == "player" and playerTotal or dealerTotal), xAnchor, yAnchor - Blackjack.cards[1].sprite:getHeight() - away - 40, Fonts.medium, {1,1,1}, {0,0,0})
+
+        local textColor = {1,1,1}
+        if (person == "player" and playerTotal > Blackjack.bust) or (person == "dealer" and dealerTotal > Blackjack.bust) then
+            textColor = {1,0,0}
+        end
+        if Blackjack.winner == person then
+            textColor = {0,1,0}
+        end
+
+        DrawTextWithBackground((person == "player" and playerTotal or dealerTotal) .. ((person == "dealer" and bub.phase == "player") and " + ?" or ""), xAnchor, yAnchor - Blackjack.cards[1].sprite:getHeight() - away - 40, Fonts.medium, textColor, {0,0,0})
     end
 end
 function InitialiseBlackjackButtons()

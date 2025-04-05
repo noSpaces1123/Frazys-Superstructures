@@ -69,15 +69,18 @@ function love.load()
         ::next::
     end
 
+    local fontName = "DMMono"
+    local fontDirectory = "assets/fonts/" .. fontName .. "/" .. fontName .. "-"
     Fonts = {
-        normal = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 17),
-        dialogue = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 27),
-        medium = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 23),
-        big = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 29),
-        time = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 300),
-        smallTime = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 150),
-        title = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 100),
-        levelNumber = love.graphics.newFont("assets/fonts/Geo/Geo-Regular.ttf", 70),
+        normal =      love.graphics.newFont(fontDirectory.."Regular.ttf", 11),
+        small =       love.graphics.newFont(fontDirectory.."Regular.ttf", 9),
+        dialogue =    love.graphics.newFont(fontDirectory.."Regular.ttf", 21),
+        medium =      love.graphics.newFont(fontDirectory.."Regular.ttf", 17),
+        big =         love.graphics.newFont(fontDirectory.."Medium.ttf", 23),
+        time =        love.graphics.newFont(fontDirectory.."Regular.ttf", 294),
+        smallTime =   love.graphics.newFont(fontDirectory.."Regular.ttf", 144),
+        title =       love.graphics.newFont(fontDirectory.."Medium.ttf", 94),
+        levelNumber = love.graphics.newFont(fontDirectory.."Italic.ttf", 45),
     }
 
     BG = {}
@@ -91,11 +94,43 @@ function love.load()
         graphics = { current = 3, max = 3 },
     }
 
+    Characters = "abcdefghijklmnopqrstuvwxyz"
+
+    Title = {
+        goal = "Adam's Superstructures",
+        unscrambleIndex = 1,
+        unscrambleInterval = { current = 0, max = 10 },
+        randomSeed = os.time(),
+        draw = function (self)
+            love.graphics.setColor(1,1,1)
+            love.graphics.setFont(Fonts.title)
+
+            local text = string.sub(self.goal, 1, self.unscrambleIndex)
+            math.randomseed(self.randomSeed)
+            for _ = 1, #self.goal - self.unscrambleIndex do
+                local i = math.random(#Characters)
+                text = text .. string.sub(Characters, i,i)
+            end
+
+            love.graphics.printf(text, 0, 200, love.graphics.getWidth(), "center")
+        end,
+        update = function (self)
+            if self.unscrambleIndex >= #self.goal then return end
+            self.unscrambleInterval.current = self.unscrambleInterval.current + 1 * GlobalDT
+            if self.unscrambleInterval.current >= self.unscrambleInterval.max then
+                self.unscrambleInterval.current = self.unscrambleInterval.current - self.unscrambleInterval.max
+                self.unscrambleIndex = self.unscrambleIndex + 1
+                self.randomSeed = self.randomSeed + 1
+            end
+        end
+    }
+
     Gravity = 0.6
 
     Level = 1
 
-    Boundary = { x = -40000, y = 0, width = 80000, height = nil, baseHeight = 4000, heightIncrement = 6000 }
+    Boundary = { x = nil, y = 0, width = ToPixels(300), height = nil, baseHeight = 4000, heightIncrement = 6000 }
+    Boundary.x = -Boundary.width / 2
     Boundary.height = Boundary.baseHeight
 
     Turrets = {}
@@ -105,7 +140,7 @@ function love.load()
     ObjectGlobalData = {
         cornerRadius = 3,
         strokeWidth = 4,
-        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000016, shrineDensity = 0.0000000005,
+        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000014, shrineDensity = 0.0000000005, bubDensity = 0.000000001,
         groundZeroNotchSpacing = 100, groundZeroNotchLength = 20,
         dangerPulseProgression = { current = 0, max = 500 },
         jumpPlatformStrength = 40,
@@ -157,7 +192,7 @@ function love.load()
     ShrineGlobalData = {
         width = 100,
         spin = 0,
-        maxHintDistance = 15000,
+        maxHintDistance = ToPixels(90),
         types = {
             ["Spirit of the Frozen Trekker"] = {
                 color = {0,1,1}, explanation = "This shrine keeps you from slipping around on ice.",
@@ -202,6 +237,7 @@ function love.load()
         noticeDistance = ToPixels(4),
         dialogueSpacingFromBub = 60,
         edgeRounding = 2,
+        maxHintDistance = ToPixels(75),
         types = {
             ["Jack"] = {
                 width = 20, height = 20, color = { 176/255, 127/255, 63/255 },
@@ -291,6 +327,7 @@ function love.load()
                             PlaySFX(SFX.drawCard, 0.2, 1)
                             bub.phase = "player"
                             Blackjack.playerPlaying = true
+                            Blackjack.winner = nil
                         elseif event == "hit" then
                             BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex)
                             local outcome = BlackjackDeal(1, "player")
@@ -351,7 +388,7 @@ function love.load()
 
     PosterGlobalData = {
         spacingFromEdgesOfObject = 20,
-        density = 0.03, -- posters to generate = density x number of objects
+        density = 0.02, -- posters to generate = density x number of objects
     }
 
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
@@ -894,6 +931,8 @@ function love.load()
     Particles = {}
     Bullets = {}
 
+    Rain = {}
+
     SaveInterval = { current = 0, max = 600 }
 
     CamLookAhead = {
@@ -943,7 +982,25 @@ function love.load()
  Changelog:
 
     Upgrades:
-    - Change: Checkpoint display and level height display bundled together into level 1 of analytics
+    - Change: Checkpoint display, level height display, and temperature display bundled together into level 1 of analytics
+
+    Bubs:
+    - New: Added Bub "Jack"
+
+    Levels:
+    - Change: Decreased level width from 400 to 300 meters for the sake of performance
+    - Change: Slightly decreased checkpoint density
+    - Change: Slightly decreased the rate at which turret density increases
+    - Change: Increased maximum shrine detection distance from 75 to 90 meters
+
+    Ambience:
+    - New: Added posters
+
+    Hooligans:
+    - Change: Now slightly easier to kill hooligans
+
+    OTHER:
+    - Change: Changed game font from Geo to Lekton for better readability (especially in differentiating between '1' and '7')
 ]]
 
     Debug = false
@@ -953,7 +1010,6 @@ function love.load()
 
     GlobalUnaffectedDT = 0
     GlobalDT = 0
-    ::continue::
 end
 
 function love.update(dt)
@@ -998,6 +1054,7 @@ function love.update(dt)
                 UpdateSaveInterval()
             else
                 UpdateTurrets()
+                Title:update(Title)
             end
         end
 
@@ -1132,9 +1189,7 @@ function love.draw()
                 DrawTextWithBackground("Best time: " .. TimeInSecondsToStupidFuckingHumanFormat(BestGameCompletionTime), love.graphics.getWidth() / 2, 80, Fonts.medium, {0,1,0}, {0,0,0})
             end
 
-            love.graphics.setColor(1,1,1)
-            love.graphics.setFont(Fonts.title)
-            love.graphics.printf("Adam's Superstructures", 0, 200, love.graphics.getWidth(), "center")
+            Title.draw(Title)
         elseif GameState == "complete" then
             DrawTextWithBackground("Intel got what they needed. Nice job!\n" .. TimeInSecondsToStupidFuckingHumanFormat(TotalTime), love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, Fonts.big, Player.color, {0,0,0})
             DrawTextWithBackground("Hit [ESC] to return to the main menu.", love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + 300, Fonts.medium, {1,1,1}, {0,0,0})
@@ -1329,6 +1384,7 @@ function GenerateObjects()
     SpawnCheckpoints()
     if Dialogue.list[25].done or true then SpawnShrines() end
     SpawnEnemies()
+    SpawnBubs()
     GenerateBG()
 end
 function GetObjectTypeFromPerlinNoise(x, y)
@@ -1687,21 +1743,48 @@ function DrawDisplays()
             break
         end
     end
-    love.graphics.print("Next upgrade: LVL " .. nextUpgrade, Fonts.levelNumber:getWidth(Level) + generalPadding * 2, generalPadding + 26)
+
+    local levelDisplay = Level
+
+    love.graphics.print("Next upgrade: LVL " .. nextUpgrade, Fonts.levelNumber:getWidth(levelDisplay) + generalPadding * 2, generalPadding + 32)
 
     love.graphics.setColor(1,1,1)
     love.graphics.setFont(Fonts.levelNumber)
-    love.graphics.print(Level, generalPadding, generalPadding - 17)
+    love.graphics.print(levelDisplay, generalPadding, generalPadding)
 
     -- distance to goal, temperature
     love.graphics.setColor(0,1,0)
-    love.graphics.setFont(Fonts.normal)
 
     local text = ""
     if AnalyticsUpgrades["misc display"] then
+        love.graphics.setFont(Fonts.normal)
         text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil") .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
+
+        -- meter scale
+        local limit = 3
+        local spacingFromBottom = 50
+        local notchHeight = 8
+        local function lilLine(i)
+            local x = love.graphics.getWidth()/2 + ToPixels(i)
+            local textSpace = 20
+            love.graphics.line(x, love.graphics.getHeight() - spacingFromBottom - notchHeight / 2, x, love.graphics.getHeight() - spacingFromBottom + notchHeight / 2)
+            love.graphics.setFont(Fonts.small)
+            love.graphics.printf(math.abs(i), x - textSpace + 1, love.graphics.getHeight() - spacingFromBottom + notchHeight / 2 + 5, textSpace * 2, "center")
+        end
+
+        love.graphics.setColor(0,1,0,0.5)
+        love.graphics.setLineWidth(1)
+        love.graphics.line(love.graphics.getWidth() / 2 - ToPixels(limit), love.graphics.getHeight() - spacingFromBottom, love.graphics.getWidth() / 2 + ToPixels(limit), love.graphics.getHeight() - spacingFromBottom)
+
+        lilLine(0)
+        for i = 1, limit do
+            lilLine(i)
+            lilLine(-i)
+        end
     end
 
+    love.graphics.setColor(0,1,0)
+    love.graphics.setFont(Fonts.normal)
     love.graphics.printf(text, 0, generalPadding, love.graphics.getWidth() - generalPadding * 2, "center")
 
     -- x location on map

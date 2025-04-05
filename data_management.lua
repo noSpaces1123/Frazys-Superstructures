@@ -5,7 +5,7 @@ function SaveData()
     end
 
     local data = {
-        objects = Objects, turrets = Turrets, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
+        bubs = Bubs, objects = Objects, turrets = Turrets, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
         level = Level, player = { x = Player.x, y = Player.y, xvelocity = Player.xvelocity, yvelocity = Player.yvelocity, temperature = Player.temperature, superJump = Player.superJump },
         playerSkill = { turretsDestroyed = PlayerSkill.turretsDestroyed, deaths = PlayerSkill.deaths, greatestBulletPresence = PlayerSkill.greatestBulletPresence, enemiesKilled = PlayerSkill.enemiesKilled },
         wayPoints = WayPoints, playerPerks = PlayerPerks, timeOnThisLevel = TimeOnThisLevel, dialogueDone = dialogueDone, totalTime = TotalTime, deathPositions = DeathPositions,
@@ -25,6 +25,7 @@ function LoadData()
     LoadPlayer()
     ResetPlayerData()
 
+    Bubs = (data.bubs and data.bubs or {})
     Objects = (data.objects and data.objects or {})
     Turrets = (data.turrets and data.turrets or {})
     Checkpoints = (data.checkpoints and data.checkpoints or {})

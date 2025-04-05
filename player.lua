@@ -21,7 +21,7 @@ function LoadPlayer()
         wallPush = false,
         instinctOfTheBulletJumperDistance = 700,
         doubleJumpUsed = false,
-        enemyKillForgiveness = 3, destroyingTurretFireRateRangeDiminishment = 270,
+        enemyKillForgiveness = 3.5, destroyingTurretFireRateRangeDiminishment = 270,
     }
     Player.jumpStrength = Player.baseJumpStrength
     Player.speed = Player.baseSpeed
@@ -306,7 +306,7 @@ function DrawPlayer()
         end
     end
 
-    local multiply = Player.width / 6
+    local multiply = Player.width / 6 * (closestDistance == seeRadius and Clamp(Player.netSpeed / 4, 0, 1) or 1)
     local angle = AngleBetween(toX, toY, Player.centerX, Player.centerY) + (closestDistance == seeRadius and 0 or math.rad(180))
     local eyeX, eyeY = Player.centerX + math.sin(angle) * multiply, Player.centerY + math.cos(angle) * multiply
     local eyeRadius = Player.width * 0.3

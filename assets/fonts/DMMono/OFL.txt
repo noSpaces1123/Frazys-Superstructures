@@ -1,5 +1,4 @@
-Copyright (c) 2000-2010, Ben Weiner (ben@readingtype.org.uk), 
-with Reserved Font Name Geo.
+Copyright 2020 The DM Mono Project Authors (https://www.github.com/googlefonts/dm-mono)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

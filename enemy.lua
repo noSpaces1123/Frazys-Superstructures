@@ -17,7 +17,7 @@ end
 
 function DrawEnemies()
     for _, enemy in ipairs(Enemies) do
-        if not enemy.dead then
+        if not enemy.dead and enemy.discovered and ((not Minimap.showing and Distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) then
             love.graphics.setColor(1,0,0)
             love.graphics.rectangle("fill", enemy.x, enemy.y, enemy.width, enemy.width)
 
