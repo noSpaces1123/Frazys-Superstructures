@@ -1017,7 +1017,7 @@ function love.load()
     - New: Turrets and Hooligans now must be discovered to appear on the minimap
 
     OTHER:
-    - Change: Changed game font from Geo to Lekton for better readability (especially in differentiating between '1' and '7')
+    - Change: Changed game font from Geo to DM Mono for better readability (especially in differentiating between '1' and '7')
 ]]
 
     Debug = false
