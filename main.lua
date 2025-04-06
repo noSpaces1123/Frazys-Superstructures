@@ -6,9 +6,12 @@ function love.load()
     require "button"
     require "enemy"
     require "bub"
+    require "weather"
+
+    NameOfTheGame = "Frazy's Superstructures"
 
     love.window.updateMode(love.graphics.getWidth(), love.graphics.getHeight(), {highdpi=true, vsync=true})
-    love.window.setTitle("Adam's Superstructures")
+    love.window.setTitle(NameOfTheGame)
     love.window.setFullscreen(true)
 
     love.filesystem.setIdentity("Adam's Superstructures")
@@ -46,6 +49,12 @@ function love.load()
         drawCard = love.audio.newSource("assets/sfx/draw card.wav", "static"),
         bust = love.audio.newSource("assets/sfx/bust.wav", "static"),
         blackjackSpotOn = love.audio.newSource("assets/sfx/blackjack spot-on.wav", "static"),
+        rain = love.audio.newSource("assets/sfx/rain.mp3", "static"),
+        checkpointFizzleOut = {
+            love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
+            love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
+            love.audio.newSource("assets/sfx/checkpoint fizzle out3.wav", "static"),
+        },
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
@@ -97,7 +106,7 @@ function love.load()
     Characters = "abcdefghijklmnopqrstuvwxyz"
 
     Title = {
-        goal = "Adam's Superstructures",
+        goal = NameOfTheGame,
         unscrambleIndex = 1,
         unscrambleInterval = { current = 0, max = 10 },
         randomSeed = os.time(),
@@ -140,7 +149,7 @@ function love.load()
     ObjectGlobalData = {
         cornerRadius = 3,
         strokeWidth = 4,
-        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000014, shrineDensity = 0.0000000005, bubDensity = 0.000000001,
+        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000014, shrineDensity = 0.0000000005, bubDensity = 0.000000002,
         groundZeroNotchSpacing = 100, groundZeroNotchLength = 20,
         dangerPulseProgression = { current = 0, max = 500 },
         jumpPlatformStrength = 40,
@@ -391,6 +400,9 @@ function love.load()
         density = 0.02, -- posters to generate = density x number of objects
     }
 
+    InitialiseWeather()
+
+    WeatherPalette = { clear = 5, rainy = 2, hot = 1 }
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
@@ -408,7 +420,7 @@ function love.load()
         { type = "normal", weight = 20 },
         { type = "icy", weight = 9 },
         { type = "death", weight = 4 },
-        { type = "jump", weight = 6 },
+        { type = "jump", weight = 4 },
         { type = "sticky", weight = 3 },
     }
     local total = 0
@@ -931,8 +943,6 @@ function love.load()
     Particles = {}
     Bullets = {}
 
-    Rain = {}
-
     SaveInterval = { current = 0, max = 600 }
 
     CamLookAhead = {
@@ -976,7 +986,7 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.3.1"
+    Version = "1.4"
     Changelog = Version ..
 [[
  Changelog:
@@ -992,12 +1002,19 @@ function love.load()
     - Change: Slightly decreased checkpoint density
     - Change: Slightly decreased the rate at which turret density increases
     - Change: Increased maximum shrine detection distance from 75 to 90 meters
+    - Change: Descreased jump pad spawn density
+    - Change: Generation (in terms of platform types) now work using Simplex noise
+    - New: Added weather (affects gameplay)
 
     Ambience:
     - New: Added posters
 
     Hooligans:
     - Change: Now slightly easier to kill hooligans
+
+    Minimap:
+    - New: Displays "Game paused." at the bottom of the screen viewing the minimap
+    - New: Turrets and Hooligans now must be discovered to appear on the minimap
 
     OTHER:
     - Change: Changed game font from Geo to Lekton for better readability (especially in differentiating between '1' and '7')
@@ -1010,6 +1027,8 @@ function love.load()
 
     GlobalUnaffectedDT = 0
     GlobalDT = 0
+
+    GlobalCanvas = love.graphics.newCanvas()
 end
 
 function love.update(dt)
@@ -1060,6 +1079,8 @@ function love.update(dt)
 
         UpdateButtons()
 
+        UpdateWeather()
+
         if GameCompleteFlash > 0 then
             GameCompleteFlash = GameCompleteFlash - 0.005 * GlobalDT
             if GameCompleteFlash < 0 then
@@ -1092,57 +1113,33 @@ function love.draw()
 
             ApplyShake()
 
-            DrawBG()
-            DrawParticles()
-            DrawObjects()
-            DrawDeathPositions()
-            DrawEnemies()
-            DrawLevelGoal()
+            if Weather.types[Weather.currentType].shader ~= nil then
+                love.graphics.setShader(Weather.types[Weather.currentType].shader)
 
-            DrawWayPoints()
-            DrawWayPointArrow()
-
-            DrawShines()
-            DrawCheckpoints()
-            DrawTurrets()
-            DrawBullets()
-
-            DrawPlayerAlignmentAxes()
-
-            love.graphics.setColor(1,1,1)
-            if Level == 1 and PlayerCanMove then
-                love.graphics.draw(Sprites.controls, -Sprites.controls:getWidth() / 2, Boundary.y + Boundary.height - 300)
-            elseif Level == 5 then
-                love.graphics.draw(Sprites.fullControls, -Sprites.fullControls:getWidth() / 2, Boundary.y + Boundary.height - 300)
+                Weather.types[Weather.currentType].shader:send("screenDimensions", {love.graphics.getWidth(), love.graphics.getHeight()})
+                Weather.types[Weather.currentType].shader:send("sinOffset", Weather.types[Weather.currentType].shaderSinOffset)
             end
 
-            DisplayTurretInfo()
-
-            DrawPlayer()
-
-            DrawMessages()
-
-            DrawHooligman()
-            DrawHooligmanDialogue()
-
-            DrawBubs()
-            DrawBubDialogue()
-
-            if Blackjack.playerPlaying then
-                DisplayBlackjackHand("player")
-                DisplayBlackjackHand("dealer")
-            end
-
-            DrawCursorReadings()
-            DrawDialogue()
+            GlobalCanvas:renderTo(DrawGameFrame)
 
             love.graphics.pop()
+
+            love.graphics.setColor(1,1,1)
+            love.graphics.draw(GlobalCanvas)
+
+            GlobalCanvas:renderTo(love.graphics.clear)
+
+            if Weather.types[Weather.currentType].shader ~= nil then
+                love.graphics.setShader()
+            end
 
             love.graphics.setColor(0,0,0,1)
             love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), 60)
 
             DrawDisplays()
             DrawPlayerSuperJumpBar()
+
+            DrawWeatherOverlay()
 
             DrawHeatIndicator()
 
@@ -1211,6 +1208,51 @@ function love.draw()
 
     love.graphics.setColor(Player.color[1],Player.color[2],Player.color[3], GameCompleteFlash)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+end
+function DrawGameFrame()
+    DrawBG()
+    DrawParticles()
+    DrawObjects()
+    DrawDeathPositions()
+    DrawEnemies()
+    DrawLevelGoal()
+
+    DrawWayPoints()
+    DrawWayPointArrow()
+
+    DrawShines()
+    DrawCheckpoints()
+    DrawTurrets()
+    DrawBullets()
+
+    DrawPlayerAlignmentAxes()
+
+    love.graphics.setColor(1,1,1)
+    if Level == 1 and PlayerCanMove then
+        love.graphics.draw(Sprites.controls, -Sprites.controls:getWidth() / 2, Boundary.y + Boundary.height - 300)
+    elseif Level == 5 then
+        love.graphics.draw(Sprites.fullControls, -Sprites.fullControls:getWidth() / 2, Boundary.y + Boundary.height - 300)
+    end
+
+    DisplayTurretInfo()
+
+    DrawPlayer()
+
+    DrawMessages()
+
+    DrawHooligman()
+    DrawHooligmanDialogue()
+
+    DrawBubs()
+    DrawBubDialogue()
+
+    if Blackjack.playerPlaying then
+        DisplayBlackjackHand("player")
+        DisplayBlackjackHand("dealer")
+    end
+
+    DrawCursorReadings()
+    DrawDialogue()
 end
 
 function ApplyGravity(object)
@@ -1525,6 +1567,11 @@ function NextLevel()
             if Settings.musicOn then Music:play() end
             PlaySFX(SFX.descended, 0.5, 1)
         end
+
+        SFX.rain:stop()
+
+        Weather.currentType = lume.weightedchoice(WeatherPalette)
+        Weather.strength = math.random()
     end
 end
 function CorrectBoundaryHeight()
@@ -2121,15 +2168,29 @@ function DrawCheckpoints()
     for _, checkpoint in ipairs(Checkpoints) do
         love.graphics.setColor(1,0,1)
         love.graphics.setLineWidth(2)
-        love.graphics.circle(((checkpoint.x == Player.checkpoint.x and checkpoint.y == Player.checkpoint.y) and "fill" or "line"),
-        checkpoint.x +math.random()-math.random(), checkpoint.y +math.random()-math.random(), CheckpointGlobalData.radius)
 
-        for _ = 1, 10 do
-            local d = math.random(360)
-            local multiply = math.random(11, 20) / 10
-            local x, y = math.sin(math.rad(d)) * CheckpointGlobalData.radius * multiply + checkpoint.x, math.cos(math.rad(d)) * CheckpointGlobalData.radius * multiply + checkpoint.y
-            local charindex = math.random(#characters)
-            love.graphics.print(string.sub(characters, charindex, charindex), x, y)
+        local fillMode = ((checkpoint.x == Player.checkpoint.x and checkpoint.y == Player.checkpoint.y) and "fill" or "line")
+        if Weather.currentType == "rainy" then
+            local isPlaying = false
+            for _, sfx in ipairs(SFX.checkpointFizzleOut) do
+                if sfx:isPlaying() then isPlaying = true; break end
+            end
+
+            if isPlaying then
+                fillMode = (math.random() < .2 and "fill" or "line")
+            end
+        end
+
+        love.graphics.circle(fillMode, checkpoint.x +math.random()-math.random(), checkpoint.y +math.random()-math.random(), CheckpointGlobalData.radius)
+
+        if Weather.currentType ~= "rainy" then
+            for _ = 1, 10 do -- random characters around the checkpoint
+                local d = math.random(360)
+                local multiply = math.random(11, 20) / 10
+                local x, y = math.sin(math.rad(d)) * CheckpointGlobalData.radius * multiply + checkpoint.x, math.cos(math.rad(d)) * CheckpointGlobalData.radius * multiply + checkpoint.y
+                local charindex = math.random(#characters)
+                love.graphics.print(string.sub(characters, charindex, charindex), x, y)
+            end
         end
     end
 end
@@ -2755,7 +2816,6 @@ end
 function DEBUG()
     Enemies = {}
     Turrets = {}
-    Player.jumpStrength = 40
 end
 
 function DrawDebug()

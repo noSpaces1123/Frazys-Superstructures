@@ -1,11 +1,16 @@
-function NewParticle(x, y, radius, color, speed, degrees, gravity, lifespan, behavior)
+function NewParticle(x, y, radius, color, speed, degrees, gravity, lifespan, behavior, texture)
     return {
         x = x, y = y, yvelocity = 0,
         radius = radius, speed = speed, gravity = gravity, degrees = degrees,
         lifespan = lifespan, color = color,
         draw = function (self)
             love.graphics.setColor(self.color)
-            love.graphics.circle("fill", self.x, self.y, self.radius)
+
+            if texture == nil then
+                love.graphics.circle("fill", self.x, self.y, self.radius)
+            else
+                texture(self)
+            end
         end,
         update = function (self)
             self.lifespan = self.lifespan - (1 + (Settings.graphics.current == 2 and 2 or 0)) * GlobalDT

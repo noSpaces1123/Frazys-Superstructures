@@ -363,6 +363,12 @@ function DoPlayerFriction()
 
     local friction = (Player.standingOnObject and Player.groundFriction or Player.airFriction)
 
+    if not Player.standingOnObject then
+        friction = friction + Weather.types[Weather.currentType].airFrictionAdd()
+    elseif Weather.currentType == "rainy" and Player.standingOnObject then
+        friction = Clamp(friction - math.random() * Weather.types[Weather.currentType].groundFrictionRandomness(), 0, math.huge)
+    end
+
     if Player.xvelocity > 0 and not Player.pressing.d then
         Player.xvelocity = Player.xvelocity - friction * GlobalDT
         if Player.xvelocity < 0 then
@@ -705,7 +711,8 @@ end
 function UpdatePlayerTemperature()
     if Player.temperature.current <= 0 then return end
 
-    Player.temperature.current = Player.temperature.current - Player.passiveCooling * GlobalDT
+    Player.temperature.current = Player.temperature.current - (Player.passiveCooling + Weather.types[Weather.currentType].passiveCoolingAdd()) * GlobalDT
+
     if Player.temperature.current < 0 then
         Player.temperature.current = 0
     end
@@ -830,14 +837,15 @@ function DoObjectEffects()
                 IncreasePlayerTemperature(-7)
                 Player.superJump.current = Player.superJump.current + Player.superJump.reward.onIce
             elseif obj.type == "jump" then
+                local jumpPlatformStrength = ObjectGlobalData.jumpPlatformStrength + Weather.types[Weather.currentType].jumpPadStrengthAdd()
                 if obj.playerTouchingSide == 3 then
-                    Player.yvelocity = Player.yvelocity - ObjectGlobalData.jumpPlatformStrength
+                    Player.yvelocity = Player.yvelocity - jumpPlatformStrength
                 elseif obj.playerTouchingSide == 1 then -- left
-                    Player.yvelocity = Player.yvelocity - ObjectGlobalData.jumpPlatformStrength / 2
-                    Player.xvelocity = Player.xvelocity - ObjectGlobalData.jumpPlatformStrength / 3
+                    Player.yvelocity = Player.yvelocity - jumpPlatformStrength / 2
+                    Player.xvelocity = Player.xvelocity - jumpPlatformStrength / 3
                 elseif obj.playerTouchingSide == 2 then -- right
-                    Player.yvelocity = Player.yvelocity - ObjectGlobalData.jumpPlatformStrength / 2
-                    Player.xvelocity = Player.xvelocity + ObjectGlobalData.jumpPlatformStrength / 3
+                    Player.yvelocity = Player.yvelocity - jumpPlatformStrength / 2
+                    Player.xvelocity = Player.xvelocity + jumpPlatformStrength / 3
                 end
             end
         end
@@ -852,34 +860,62 @@ end
 function CheckCollisionWithCheckpoints()
     for _, checkpoint in ipairs(Checkpoints) do
         if checkpoint.x ~= Player.checkpoint.x and checkpoint.y ~= Player.checkpoint.y and Distance(Player.x, Player.y, checkpoint.x, checkpoint.y) <= Player.width / 2 + CheckpointGlobalData.radius * 1.2 then
-            SetCheckpoint(checkpoint)
-            SaveData()
-
-            for _ = 1, 30 do
-                local degrees = math.random(360)
-                local radius = math.random() * 3 + 4
-                local speed = math.random() * 6 + 6
-                local decay = math.random(100, 160)
-                table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
-                function (self)
-                    if self.speed > 0 then
-                        self.speed = self.speed - 0.02 * GlobalDT
-                        if self.speed <= 0 then
-                            self.speed = 0
-                        end
-                    end
-                end))
-            end
-
-            for _, turret in ipairs(Turrets) do
-                if Distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
-                    ExplodeTurret(turret)
+            if Weather.currentType == "rainy" then
+                local sfxIsPlaying = false
+                for _, value in ipairs(SFX.checkpointFizzleOut) do
+                    if value:isPlaying() then sfxIsPlaying = true; break end
                 end
-            end
 
-            for _, enemy in ipairs(Enemies) do
-                if Distance(enemy.x, enemy.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
-                    ExplodeEnemy(enemy)
+                if not sfxIsPlaying then
+                    PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
+
+                    for _ = 1, 20 do
+                        local degrees = math.random(360)
+                        local radius = math.random() * 3 + 2
+                        local speed = math.random() * 5 + 2
+                        local decay = math.random(400, 600)
+                        table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
+                        function (self)
+                            self.degrees = self.degrees + Jitter(60)
+                            if self.speed > 0 then
+                                self.speed = self.speed - 0.02 * GlobalDT
+                                if self.speed <= 0 then
+                                    self.speed = 0
+                                end
+                            end
+                        end))
+                    end
+                end
+            else
+                SetCheckpoint(checkpoint)
+                SaveData()
+
+                for _ = 1, 30 do
+                    local degrees = math.random(360)
+                    local radius = math.random() * 3 + 4
+                    local speed = math.random() * 6 + 6
+                    local decay = math.random(100, 160)
+                    table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
+                    function (self)
+                        if self.speed > 0 then
+                            self.speed = self.speed - 0.02 * GlobalDT
+                            if self.speed <= 0 then
+                                self.speed = 0
+                            end
+                        end
+                    end))
+                end
+
+                for _, turret in ipairs(Turrets) do
+                    if Distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
+                        ExplodeTurret(turret)
+                    end
+                end
+
+                for _, enemy in ipairs(Enemies) do
+                    if Distance(enemy.x, enemy.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
+                        ExplodeEnemy(enemy)
+                    end
                 end
             end
         end
