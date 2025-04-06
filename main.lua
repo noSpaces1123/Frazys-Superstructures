@@ -620,9 +620,9 @@ function love.load()
                 end
             },
             {
-                text = "Intel also said I can use [M] to open up a view of the map.",
+                text = "Intel said I can use [M] to open up the minimap.",
                 when = function ()
-                    return Level == 6
+                    return AnalyticsUpgrades["minimap"]
                 end
             },
             {
@@ -986,38 +986,13 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4"
+    Version = "1.4.1"
     Changelog = Version ..
 [[
  Changelog:
 
-    Upgrades:
-    - Change: Checkpoint display, level height display, and temperature display bundled together into level 1 of analytics
-
-    Bubs:
-    - New: Added Bub "Jack"
-
-    Levels:
-    - Change: Decreased level width from 400 to 300 meters for the sake of performance
-    - Change: Slightly decreased checkpoint density
-    - Change: Slightly decreased the rate at which turret density increases
-    - Change: Increased maximum shrine detection distance from 75 to 90 meters
-    - Change: Descreased jump pad spawn density
-    - Change: Generation (in terms of platform types) now work using Simplex noise
-    - New: Added weather (affects gameplay)
-
-    Ambience:
-    - New: Added posters
-
-    Hooligans:
-    - Change: Now slightly easier to kill hooligans
-
-    Minimap:
-    - New: Displays "Game paused." at the bottom of the screen viewing the minimap
-    - New: Turrets and Hooligans now must be discovered to appear on the minimap
-
-    OTHER:
-    - Change: Changed game font from Geo to DM Mono for better readability (especially in differentiating between '1' and '7')
+    Analytics:
+    - Change: Scale bar changed to be vertical rather than horizontal
 ]]
 
     Debug = false
@@ -1808,20 +1783,18 @@ function DrawDisplays()
         text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil") .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
 
         -- meter scale
-        local limit = 3
+        local limit = 1
         local spacingFromBottom = 50
-        local notchHeight = 8
+        local spacingFromSide = 50
+        local halfNotchWidth = 8
         local function lilLine(i)
-            local x = love.graphics.getWidth()/2 + ToPixels(i)
-            local textSpace = 20
-            love.graphics.line(x, love.graphics.getHeight() - spacingFromBottom - notchHeight / 2, x, love.graphics.getHeight() - spacingFromBottom + notchHeight / 2)
-            love.graphics.setFont(Fonts.small)
-            love.graphics.printf(math.abs(i), x - textSpace + 1, love.graphics.getHeight() - spacingFromBottom + notchHeight / 2 + 5, textSpace * 2, "center")
+            local y = love.graphics.getHeight() / 2 + ToPixels(i)
+            love.graphics.line(spacingFromBottom - halfNotchWidth, y, spacingFromBottom + halfNotchWidth, y)
         end
 
         love.graphics.setColor(0,1,0,0.5)
         love.graphics.setLineWidth(1)
-        love.graphics.line(love.graphics.getWidth() / 2 - ToPixels(limit), love.graphics.getHeight() - spacingFromBottom, love.graphics.getWidth() / 2 + ToPixels(limit), love.graphics.getHeight() - spacingFromBottom)
+        love.graphics.line(spacingFromSide, love.graphics.getHeight() / 2 - ToPixels(limit), spacingFromSide, love.graphics.getHeight() / 2 + ToPixels(limit))
 
         lilLine(0)
         for i = 1, limit do

@@ -17,7 +17,7 @@ function LoadPlayer()
         superJump = { current = 0, max = 1500, cost = 900, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
         checkpoint = { x = nil, y = nil },
         timeStill = 0, timeStillFocusDivisor = 200,
-        renderDistance = 3000,
+        renderDistance = ToPixels(10),
         wallPush = false,
         instinctOfTheBulletJumperDistance = 700,
         doubleJumpUsed = false,
@@ -57,6 +57,11 @@ function ResetPlayerData()
     PlayerUpgrades = {}
     for _, value in pairs(Upgrades) do
         PlayerUpgrades[value.name] = 0
+    end
+
+    AnalyticsUpgrades = {}
+    for _, value in ipairs(Upgrades[3].list) do
+        AnalyticsUpgrades[value] = false
     end
 end
 function ResetGame()
