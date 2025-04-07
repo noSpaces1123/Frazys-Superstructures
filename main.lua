@@ -998,22 +998,21 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.1"
+    Version = "1.4.2"
     Changelog = Version ..
 [[
  Changelog:
 
-    Analytics:
-    - Change: Scale bar changed to be vertical rather than horizontal
-    - Change: Added weather info to level 1 of analytics
-
     Weather:
-    - Change: Brightened rainy levels
-    - Change: Changed all weather types to be equally likely
-    - New: Added dialogue to make it extra clear that checkpoints don't work in rainy levels
+    - New: Heat platforms do not spawn in rainy levels
+    - New: Icy platforms do not spawn in hot levels
+    - New: Rain drop particles in rainy levels
 
-    Hooligans:
-    - Fixed: Hooligans clipping through the player with no effect
+    Upgrades:
+    - New: Added suit upgrade for water-proof checkpoints (level 3)
+
+    Turrets and hooligans:
+    - Fixed: Targeting indicator (line from threat to player) not rendering when the threat has not been discovered
 ]]
 
     Debug = false
@@ -1170,6 +1169,7 @@ function love.draw()
         DrawTurrets()
         DrawEnemies()
         DrawLevelGoal()
+        DrawWeatherOverlay()
 
         love.graphics.pop()
 
@@ -1424,6 +1424,8 @@ function GenerateObjects()
     SpawnEnemies()
     SpawnBubs()
     GenerateBG()
+
+    StartWeather()
 end
 function GetObjectTypeFromPerlinNoise(x, y)
     local totalObjectTypes = 0; for _, _ in pairs(ObjectTypeData) do totalObjectTypes = totalObjectTypes + 1 end
@@ -1568,8 +1570,6 @@ function NextLevel()
 
         Weather.currentType = lume.weightedchoice(WeatherPalette)
         Weather.strength = math.random()
-
-        StartWeather()
     end
 end
 function CorrectBoundaryHeight()
@@ -1776,6 +1776,8 @@ function TimeInSecondsToStupidFuckingHumanFormat(time)
 end
 
 function DrawDisplays()
+    if Weather.currentType == "rainy" and math.random() > 1 - Weather.strength / 2 then return end
+
     local generalPadding = 5
 
     -- level number
@@ -1974,6 +1976,8 @@ function UpdateTurrets()
             end
 
             Player.targeted = true
+
+            turret.discovered = true
 
             turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
             turret.objectiveSearchingAngle = turret.searchingAngle
@@ -2631,23 +2635,26 @@ function InitialiseUpgrades()
     AnalyticsUpgrades = {}
 
     SuitUpgrades = {
+        function () -- stronger jump-pads
+            ObjectGlobalData.jumpPlatformStrength = 50
+        end,
         function () -- vault higher
             Player.divisorWhenConvertingXToYVelocity = 1.7
+        end,
+        function () -- water-proof checkpoints
+            Player.waterProofCheckpoints = true
         end,
         function () -- better traction
             Player.groundFriction = 1.3
         end,
-        function () -- stronger jump-pads
-            ObjectGlobalData.jumpPlatformStrength = 50
+        function () -- better cooling
+            Player.passiveCooling = 0.7
         end,
         function () -- vault higher ii
             Player.divisorWhenConvertingXToYVelocity = 1.3
         end,
         function () -- better traction ii
             Player.groundFriction = 1.7
-        end,
-        function () -- better cooling
-            Player.passiveCooling = 0.7
         end,
     }
 
@@ -2688,6 +2695,7 @@ function InitialiseUpgrades()
             list = {
                 "stronger jump-pads",
                 "vault higher",
+                "water-proof checkpoints",
                 "better traction",
                 "better cooling",
                 "vault higher ii",
@@ -2781,7 +2789,7 @@ function DrawUpgradeMenuOverlay()
     for index = 1, #Upgrades do
         local category = Upgrades[index].name
         local level = Upgrades[index].list[PlayerUpgrades[category]]
-        local text = string.upper(category) .. ": " .. string.upper((level and level .. " unlocked" or "not upgraded"))
+        local text = string.upper(category) .. ": " .. string.upper(((level and level and PlayerUpgrades[category] < #Upgrades[index].list) .. " unlocked" or "not upgraded"))
 
         DrawTextWithBackground(text,
         love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2), Fonts.medium, (level and {1,1,1} or {1,0,0}), {0,0,0})
@@ -2794,7 +2802,7 @@ function DrawUpgradeMenuOverlay()
             subText = "next: " .. nextLevel
         end
         DrawTextWithBackground(subText,
-        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2) + 30, Fonts.normal, {.5,.5,.5}, {0,0,0})
+        love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2) + 30, Fonts.normal, {.7,.7,.7}, {0,0,0})
     end
 
     DrawTextWithBackground("PICK AN UPGRADE", love.graphics.getWidth() / 2, 80, Fonts.big, {1,1,0}, {0,0,0,0})

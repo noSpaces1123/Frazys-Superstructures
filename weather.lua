@@ -21,12 +21,20 @@ function InitialiseWeather()
                         SFX.rain:setLooping(true)
                         PlaySFX(SFX.rain, 0.7 * Weather.strength + .02, 1)
                     end
+
+                    for _, obj in ipairs(Objects) do
+                        if obj.render and math.random() <= 0.1 * Weather.strength then
+                            local x, y = math.random(obj.x, obj.x + obj.width), obj.y
+                            for _ = 1, 6, 1 do
+                                table.insert(Particles, NewParticle(x, y, math.random() * 2, {1,1,1,math.random()/2+.6}, math.random()*2+.5, math.random(160, 200), 0.06, math.random(100, 160)))
+                            end
+                        end
+                    end
                 end,
                 start = function (self)
                     for _, obj in ipairs(Objects) do
                         if obj.type == "death" then
                             obj.type = lume.randomchoice({"icy", "normal"})
-                            error()
                         end
                     end
                 end
@@ -64,7 +72,7 @@ vec4 effect(vec4 color, Image image, vec2 texture_coords, vec2 screen_coords) {
                             obj.type = lume.randomchoice({"death", "normal"})
                         end
                     end
-                end
+                end,
             },
         }
     }

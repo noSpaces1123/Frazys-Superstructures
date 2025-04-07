@@ -865,7 +865,7 @@ end
 function CheckCollisionWithCheckpoints()
     for _, checkpoint in ipairs(Checkpoints) do
         if checkpoint.x ~= Player.checkpoint.x and checkpoint.y ~= Player.checkpoint.y and Distance(Player.x, Player.y, checkpoint.x, checkpoint.y) <= Player.width / 2 + CheckpointGlobalData.radius * 1.2 then
-            if Weather.currentType == "rainy" then
+            if Weather.currentType == "rainy" and not Player.waterProofCheckpoints then
                 local sfxIsPlaying = false
                 for _, value in ipairs(SFX.checkpointFizzleOut) do
                     if value:isPlaying() then sfxIsPlaying = true; break end

@@ -63,6 +63,8 @@ function UpdateEnemies()
                     if enemy.seesPlayer then
                         Player.targeted = true
 
+                        enemy.discovered = true
+
                         local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(Jitter(20))
                         enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * GlobalDT
                         enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * GlobalDT
