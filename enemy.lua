@@ -67,7 +67,15 @@ function UpdateEnemies()
                         enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * GlobalDT
                         enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * GlobalDT
                     end
+                end
 
+                DoEnemyFriction(index)
+                DoEnemyCollisions(index)
+
+                enemy.x = enemy.x + enemy.xvelocity * GlobalDT
+                enemy.y = enemy.y + enemy.yvelocity * GlobalDT
+
+                if not Player.respawnWait.dead and not NextLevelAnimation.running then
                     if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
                         if Player.netSpeed + Player.enemyKillForgiveness >= Pythag(enemy.xvelocity, enemy.yvelocity) then
                             ExplodeEnemy(enemy)
@@ -85,12 +93,6 @@ function UpdateEnemies()
                     table.insert(Particles,
                     NewParticle(math.random(enemy.x + enemy.width / 4, enemy.x + enemy.width - enemy.width / 4), math.random(enemy.y + enemy.width / 4, enemy.y + enemy.width - enemy.width / 4), 4, {1,0,0,0.4}, 0, 0, 0, 30))
                 end
-
-                DoEnemyFriction(index)
-                DoEnemyCollisions(index)
-
-                enemy.x = enemy.x + enemy.xvelocity * GlobalDT
-                enemy.y = enemy.y + enemy.yvelocity * GlobalDT
 
                 -- warbling
                 local maxWarbleHearing = 2000

@@ -874,6 +874,8 @@ function CheckCollisionWithCheckpoints()
                 if not sfxIsPlaying then
                     PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
 
+                    PlayDialogue(57)
+
                     for _ = 1, 20 do
                         local degrees = math.random(360)
                         local radius = math.random() * 3 + 2

@@ -15,11 +15,19 @@ function InitialiseWeather()
                 jumpPadStrengthAdd = function () return 0 end,
                 passiveCoolingAdd = function () return 0.5 * Weather.strength end,
                 groundFrictionRandomness = function () return 3 * Weather.strength end,
-                overlay = {0,0,.3,.5}, secondOverlay = {0,0,0,.6},
+                overlay = {0,0,.3,.5}, secondOverlay = {0,0,0,.4},
                 update = function (self)
                     if not SFX.rain:isPlaying() then
                         SFX.rain:setLooping(true)
-                        PlaySFX(SFX.rain, 0.9 * Weather.strength + .05, 1)
+                        PlaySFX(SFX.rain, 0.7 * Weather.strength + .02, 1)
+                    end
+                end,
+                start = function (self)
+                    for _, obj in ipairs(Objects) do
+                        if obj.type == "death" then
+                            obj.type = lume.randomchoice({"icy", "normal"})
+                            error()
+                        end
                     end
                 end
             },
@@ -49,10 +57,23 @@ vec4 effect(vec4 color, Image image, vec2 texture_coords, vec2 screen_coords) {
                     if self.shaderSinOffset >= 360 then
                         self.shaderSinOffset = self.shaderSinOffset - 360
                     end
+                end,
+                start = function (self)
+                    for _, obj in ipairs(Objects) do
+                        if obj.type == "icy" then
+                            obj.type = lume.randomchoice({"death", "normal"})
+                        end
+                    end
                 end
             },
         }
     }
+end
+
+function StartWeather()
+    if Weather.types[Weather.currentType].start ~= nil then
+        Weather.types[Weather.currentType].start(Weather.types[Weather.currentType])
+    end
 end
 
 function DrawWeatherOverlay()

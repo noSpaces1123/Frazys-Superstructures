@@ -402,7 +402,7 @@ function love.load()
 
     InitialiseWeather()
 
-    WeatherPalette = { clear = 5, rainy = 2, hot = 1 }
+    WeatherPalette = { clear = 3, rainy = 3, hot = 3 }
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
@@ -885,6 +885,18 @@ function love.load()
                     return Level == Descending.onLevels[2] + 1
                 end
             },
+            {
+                text = "That's cold!",
+                when = function ()
+                    return not Dialogue.playing.running and Weather.currentType == "rainy"
+                end
+            },
+            {
+                text = "Looks like checkpoints don't work in the rain...",
+                when = function ()
+                    return false
+                end
+            },
         },
         eventual = {
             killEnemy = {
@@ -993,6 +1005,15 @@ function love.load()
 
     Analytics:
     - Change: Scale bar changed to be vertical rather than horizontal
+    - Change: Added weather info to level 1 of analytics
+
+    Weather:
+    - Change: Brightened rainy levels
+    - Change: Changed all weather types to be equally likely
+    - New: Added dialogue to make it extra clear that checkpoints don't work in rainy levels
+
+    Hooligans:
+    - Fixed: Hooligans clipping through the player with no effect
 ]]
 
     Debug = false
@@ -1360,7 +1381,7 @@ function GenerateObjects()
 
     math.randomseed(Seed)
     for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
-        local x, y = math.random(Boundary.x, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height)
+        local x, y = math.random(Boundary.x - boundaryObjWidth, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height)
 
         local objectType = GetObjectTypeFromPerlinNoise(x, y)
 
@@ -1547,6 +1568,8 @@ function NextLevel()
 
         Weather.currentType = lume.weightedchoice(WeatherPalette)
         Weather.strength = math.random()
+
+        StartWeather()
     end
 end
 function CorrectBoundaryHeight()
@@ -1779,8 +1802,23 @@ function DrawDisplays()
 
     local text = ""
     if AnalyticsUpgrades["misc display"] then
+        local weatherClasses = { "A", "B", "C", "D" }
+        local weatherClass
+        local increment = 1 / #weatherClasses
+        local index = #weatherClasses
+        for i = 1 - increment, 0, -increment do
+            if Weather.strength >= i then
+                weatherClass = weatherClasses[index]
+                break
+            end
+            index = index - 1
+        end
+
         love.graphics.setFont(Fonts.normal)
-        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) .. " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil") .. " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%"
+        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) ..
+        " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil") ..
+        " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%" ..
+        " | weather: " .. Weather.currentType .. (Weather.currentType ~= "clear" and ", Class " .. weatherClass or "")
 
         -- meter scale
         local limit = 1
