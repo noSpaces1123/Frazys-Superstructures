@@ -1,7 +1,7 @@
 function LoadPlayer()
     Player = {
         x = 0, y = Boundary.y + Boundary.height, centerX = 0, centerY = 0,
-        width = 10, height = 10, color = { 0,1,1 }, zoom = 0.4,
+        width = 10, height = 10, color = { 0,1,1 }, baseZoom = 0.4, zoom = 0,
         baseSpeed = 0.35, speed = nil, netSpeed = 0, baseJumpStrength = 20, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
         standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false }, touchingStickyObject = false, touchingBottomOfObject = false,
@@ -22,9 +22,11 @@ function LoadPlayer()
         instinctOfTheBulletJumperDistance = 700,
         doubleJumpUsed = false,
         enemyKillForgiveness = 3.5, destroyingTurretFireRateRangeDiminishment = 270,
+        selfDestruct = { current = 0, max = 100 },
     }
     Player.jumpStrength = Player.baseJumpStrength
     Player.speed = Player.baseSpeed
+    Player.zoom = Player.baseZoom
     WayPoints = {}
 end
 function RespawnPlayer()
@@ -96,8 +98,6 @@ function UpdatePlayer()
         CheckIfPlayerHasCompletedLevel()
         UpdatePlayerTemperature()
         CheckCollisionWithBullets()
-        CheckCollisionWithTurret()
-        CheckCollisionWithCheckpoints()
         CheckCollisionWithWayPoint()
         DoPlayerGoalMagentismParticles()
         UpdatePlayerSuperJumpBar()
@@ -108,6 +108,8 @@ function UpdatePlayer()
     end
 
     UpdatePlayerRespawnWait()
+
+    UpdateEffectsOfPlayerSelfDestruct()
 end
 
 function love.keypressed(key)
@@ -183,7 +185,7 @@ function UpdateKeyBuffer()
             else
                 StartSlowMo(true, true, false)
             end
-        elseif key == "r" and Paused and GameState == "game" then
+        elseif CommandLine.verified and key == "r" and Paused and GameState == "game" then
             GenerateObjects()
             LoadPlayer()
             SaveData()
@@ -344,6 +346,19 @@ function DoPlayerKeyPresses()
         end
         if Player.pressing.d then
             Player.xvelocity = Player.xvelocity + Player.speed * GlobalDT
+        end
+
+        if love.keyboard.isDown("b") then
+            Player.selfDestruct.current = Player.selfDestruct.current + 1 * GlobalDT
+            if Player.selfDestruct.current >= Player.selfDestruct.max then
+                Player.selfDestruct.current = 0
+                KillPlayer()
+            end
+        elseif Player.selfDestruct.current > 0 then
+            Player.selfDestruct.current = Player.selfDestruct.current - 4 * GlobalDT
+            if Player.selfDestruct.current <= 0 then
+                Player.selfDestruct.current = 0
+            end
         end
 
         --[[
@@ -668,22 +683,6 @@ function CheckAndIfSoDoPlayerSmash(objIndex)
     end
 end
 
-function CheckCollisionWithTurret()
-    for _, turret in ipairs(Turrets) do
-        if Distance(Player.centerX, Player.centerY, turret.x, turret.y) <= TurretGlobalData.headRadius + Player.width / 2 then
-            ExplodeTurret(turret)
-
-            Player.xvelocity = -Player.xvelocity
-            Player.yvelocity = -Player.yvelocity
-
-            PlayerSkill.turretsDestroyed = PlayerSkill.turretsDestroyed + 1
-
-            Player.superJump.current = Player.superJump.current + Player.superJump.reward.explodingTurret
-            SaveData()
-        end
-    end
-end
-
 function ConvertPlayerVelocityToCameraLookAhead()
     local xtowards, ytowards = (Player.xvelocity > 0 and -1 or 1), (Player.yvelocity > 0 and -1 or 1)
     return Clamp((math.abs(Player.xvelocity) - 5) / 3, 0, math.huge) * xtowards, Clamp((math.abs(Player.yvelocity) - 5) / 3, 0, math.huge) * ytowards
@@ -809,6 +808,7 @@ function DoPlayerSuperJump()
     if not Dialogue.list[13].done then return end
 
     if CanSuperJump() then
+        Player.touchingStickyObject = false
         Player.yvelocity = Player.yvelocity + Player.superJumpStrength * (Descending.doingSo and 1 or -1)
         Player.superJump.current = Player.superJump.current - Player.superJump.cost
     end
@@ -1199,4 +1199,20 @@ end
 function DrawDialogue()
     if not Dialogue.playing.running then return end
     DrawTextWithBackground(Dialogue.playing.text, Player.centerX, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
+end
+
+function UpdateEffectsOfPlayerSelfDestruct()
+    Player.zoom = Player.baseZoom + 0.2 * EaseInExpo(Player.selfDestruct.current / Player.selfDestruct.max)
+
+    if Player.selfDestruct.current > 0 then
+        local ratio = Player.selfDestruct.current / Player.selfDestruct.max
+        PlaySFX(SFX.selfDestruct, ratio * 0.5, math.random() * ratio + ratio * 2)
+        ShakeIntensity = ratio * 10
+    end
+end
+function DrawPlayerSelfDestructOverlay()
+    love.graphics.setBlendMode("add", "alphamultiply")
+    love.graphics.setColor(1,0,0, Player.selfDestruct.current / Player.selfDestruct.max / 2)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    love.graphics.setBlendMode("alpha")
 end

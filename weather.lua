@@ -19,7 +19,7 @@ function InitialiseWeather()
                 update = function (self)
                     if not SFX.rain:isPlaying() then
                         SFX.rain:setLooping(true)
-                        PlaySFX(SFX.rain, 0.7 * Weather.strength + .02, 1)
+                        PlaySFX(SFX.rain, 0.2 * Weather.strength + .02, 1)
                     end
 
                     for _, obj in ipairs(Objects) do
@@ -108,6 +108,8 @@ function DrawWeatherOverlay()
             local x, y, width = math.random(0, love.graphics.getWidth()), EaseOutQuint(math.random()) * love.graphics.getHeight(), 3
             love.graphics.rectangle("fill", x, y, width, width)
         end
+
+        love.graphics.setBlendMode("alpha")
     end
 end
 

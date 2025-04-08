@@ -85,6 +85,11 @@ function DrawBubs()
 
             love.graphics.setColor(0,0,0)
             love.graphics.circle("fill", eyeX, eyeY, eyeRadius, 100)
+
+            if bub.type == "Jack" then
+                love.graphics.setColor(1,1,1)
+                love.graphics.draw(Sprites.jacksHat, bub.x + bubData.width / 2 - Sprites.jacksHat:getWidth() / 2, bub.y - Sprites.jacksHat:getHeight() * 0.6)
+            end
         end
 
         if AnalyticsUpgrades["signal radar"] and distance <= BubGlobalData.maxHintDistance and distance > BubGlobalData.noticeDistance then

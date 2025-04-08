@@ -5,6 +5,7 @@ function love.load()
     require "data_management"
     require "button"
     require "enemy"
+    require "turret"
     require "bub"
     require "weather"
 
@@ -50,6 +51,7 @@ function love.load()
         bust = love.audio.newSource("assets/sfx/bust.wav", "static"),
         blackjackSpotOn = love.audio.newSource("assets/sfx/blackjack spot-on.wav", "static"),
         rain = love.audio.newSource("assets/sfx/rain.mp3", "static"),
+        selfDestruct = love.audio.newSource("assets/sfx/self destruct.wav", "static"),
         checkpointFizzleOut = {
             love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
             love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
@@ -70,6 +72,7 @@ function love.load()
         cross = love.graphics.newImage("assets/sprites/cross.png", {dpiscale=10}),
         controls = love.graphics.newImage("assets/sprites/controls.png", {dpiscale=8}),
         fullControls = love.graphics.newImage("assets/sprites/full controls.png", {dpiscale=7}),
+        jacksHat = love.graphics.newImage("assets/sprites/jack's hat.png", {dpiscale=13}),
         posters = {}
     }
     for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/posters")) do
@@ -991,7 +994,7 @@ function love.load()
     CommandLine = {
         typing = false,
         text = "",
-        history = {},
+        history = { "ENTER PASSKEY." },
     }
 
     GameState = "menu"
@@ -1013,6 +1016,16 @@ function love.load()
 
     Turrets and hooligans:
     - Fixed: Targeting indicator (line from threat to player) not rendering when the threat has not been discovered
+
+    Sticky platforms:
+    - Fixed: Not being able to super-jump off of sticky platforms
+
+    QoL:
+    - New: Self-destruct with [B]
+    - Removed: Level regeneration with [R] when paused
+
+    Performance:
+    - Enhanced: Significant performance enhancement, finally.
 ]]
 
     Debug = false
@@ -1024,6 +1037,9 @@ function love.load()
     GlobalDT = 0
 
     GlobalCanvas = love.graphics.newCanvas()
+
+    StartEnemyUpdateThread()
+    StartTurretUpdateThread()
 end
 
 function love.update(dt)
@@ -1048,15 +1064,15 @@ function love.update(dt)
 
                     if not Descending.hooligmanCutscene.running then
                         UpdateParticles()
-                        UpdateTurrets()
+                        UpdateMovables()
                         UpdateBullets()
                         UpdateShrines()
                         UpdateMessages()
-                        UpdateEnemies()
                         UpdateBubs()
                         UpdateDialogue()
                         UpdateBubDialogue()
                         DiscoverAndRenderDiscoverables()
+                        UpdateWeather()
                     end
 
                     UpdateHooligmanCutscene()
@@ -1067,14 +1083,12 @@ function love.update(dt)
 
                 UpdateSaveInterval()
             else
-                UpdateTurrets()
+                UpdateMovables()
                 Title:update(Title)
             end
         end
 
         UpdateButtons()
-
-        UpdateWeather()
 
         if GameCompleteFlash > 0 then
             GameCompleteFlash = GameCompleteFlash - 0.005 * GlobalDT
@@ -1137,6 +1151,7 @@ function love.draw()
             DrawWeatherOverlay()
 
             DrawHeatIndicator()
+            DrawPlayerSelfDestructOverlay()
 
             DrawDebug()
 
@@ -1549,6 +1564,10 @@ function NextLevel()
     else
         Level = Level + 1
         Seed = os.time()
+
+        Weather.currentType = lume.weightedchoice(WeatherPalette)
+        Weather.strength = math.random()
+
         PlaySFX(SFX.nextLevel, .4, 1)
         CorrectBoundaryHeight()
         CorrectEnemyDensity()
@@ -1567,9 +1586,6 @@ function NextLevel()
         end
 
         SFX.rain:stop()
-
-        Weather.currentType = lume.weightedchoice(WeatherPalette)
-        Weather.strength = math.random()
     end
 end
 function CorrectBoundaryHeight()
@@ -1594,7 +1610,9 @@ function UpdateNextLevelAnimation()
         MessageWithPlayerStats()
         SaveData()
 
-        OpenUpgradeMenu()
+        if not OpenUpgradeMenu() then
+            PlaySFX(SFX.playerSpawn, 0.5, 1)
+        end
     end
 end
 function ApplyNextLevelAnimation()
@@ -1799,6 +1817,12 @@ function DrawDisplays()
     love.graphics.setFont(Fonts.levelNumber)
     love.graphics.print(levelDisplay, generalPadding, generalPadding)
 
+    -- self destruct button
+    local divisor = 3
+    love.graphics.setColor(1,0,0, Player.selfDestruct.current / Player.selfDestruct.max / divisor + 1/divisor)
+    love.graphics.setFont(Fonts.medium)
+    love.graphics.printf("[B] TO SELF-DESTRUCT", 0, love.graphics.getHeight() - love.graphics.getFont():getHeight() - generalPadding, love.graphics.getWidth() - generalPadding, "right")
+
     -- distance to goal, temperature
     love.graphics.setColor(0,1,0)
 
@@ -1924,239 +1948,11 @@ end
 function EaseOutQuint(x)
     return 1 - (1 - x)^5
 end
+function EaseInExpo(x)
+    return (x == 0 and 0 or 2^(10 * x - 10))
+end
 function EaseInOutCubic(x)
     return (x < 0.5 and 4 * x^3 or 1 - (-2 * x + 2)^3 / 2)
-end
-
-function SpawnTurrets(playerSafeArea)
-    Turrets = {}
-
-    math.randomseed(os.time())
-    for _ = 1, ObjectGlobalData.turretDensity * Boundary.width * Boundary.height do
-        NewTurret(math.random(Boundary.x, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height),
-        math.random(TurretGlobalData.fireInterval.min, TurretGlobalData.fireInterval.max))
-    end
-
-    for _, turret in ipairs(Turrets) do
-        for _, obj in ipairs(Objects) do
-            if Touching(turret.x, turret.y, 0, 0, obj.x, obj.y, obj.width, obj.height) or
-            Touching(turret.x, turret.y, 0, 0, -playerSafeArea, Boundary.y + Boundary.height - playerSafeArea, playerSafeArea * 2, playerSafeArea * 2) then
-                lume.remove(Turrets, turret)
-            end
-        end
-    end
-end
-function NewTurret(x, y, fireInterval, notOnMap)
-    table.insert(Turrets, {
-        x = x, y = y, viewRadius = math.random(TurretGlobalData.viewRadius.min, TurretGlobalData.viewRadius.max),
-        fireRate = { current = 0, max = fireInterval }, seesPlayer = false, searchingAngle = math.random(-360, 360), objectiveSearchingAngle = math.random(-360, 360),
-        searchWait = { current = 0, max = 100, running = false, },
-        type = lume.weightedchoice(TurretGenerationPalette),
-        notMinimapVisible = notOnMap,
-        threat = { x = 0, y = 0, on = false },
-        homing = math.random() <= 0.05,
-        inaccuracy = math.random(TurretGlobalData.inaccuracy.min, TurretGlobalData.inaccuracy.max),
-        warble = { current = 0, max = math.random(TurretGlobalData.warble.min, TurretGlobalData.warble.max) },
-    })
-end
-function UpdateTurrets()
-    TurretGlobalData.threatUpdateInterval.current = TurretGlobalData.threatUpdateInterval.current + 1 * GlobalDT
-
-    for turretIndex, turret in ipairs(Turrets) do
-        local distance = Distance(turret.x, turret.y, Player.centerX, Player.centerY)
-
-        local before = turret.seesPlayer
-        turret.seesPlayer = distance <= turret.viewRadius
-
-        if distance > Player.renderDistance and GameState == "game" then goto continue end
-
-        if not Player.respawnWait.dead and turret.seesPlayer and not NextLevelAnimation.running and GameState == "game" then
-            if not before and turret.seesPlayer then
-                PlaySFX(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
-            end
-
-            Player.targeted = true
-
-            turret.discovered = true
-
-            turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
-            turret.objectiveSearchingAngle = turret.searchingAngle
-
-            local angle = AngleBetween(turret.x, turret.y, Player.x, Player.y) + math.rad(math.random(turret.inaccuracy) * (lume.randomchoice({true,false}) and 1 or -1))
-
-            turret.fireRate.current = turret.fireRate.current + 1 * GlobalDT / (distance <= Player.destroyingTurretFireRateRangeDiminishment and 1.5 or 1)
-            if turret.fireRate.current >= turret.fireRate.max then
-                if turret.type == "normal" then
-                    PlaySFX(SFX.shoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
-                    turret.fireRate.current = 0
-                    FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed, turretIndex)
-                elseif turret.type == "laser" then
-                    PlaySFX(SFX.jump, .1, .6)
-                    IncreasePlayerTemperature(2.5)
-                elseif turret.type == "drag" then
-                    turret.fireRate.current = 0
-                    PlaySFX(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
-                    DragPlayerTowards(turret.x, turret.y, 10)
-                end
-            end
-        else
-            turret.fireRate.current = 0
-
-            turret.seesPlayer = false
-
-            if Settings.graphics.current >= 2 then
-                local speed = 0.5
-                if turret.searchingAngle < turret.objectiveSearchingAngle then
-                    turret.searchingAngle = turret.searchingAngle + speed * GlobalDT
-                    if turret.searchingAngle > turret.objectiveSearchingAngle then
-                        turret.searchingAngle = turret.objectiveSearchingAngle
-                    end
-                elseif turret.searchingAngle > turret.objectiveSearchingAngle then
-                    turret.searchingAngle = turret.searchingAngle - speed * GlobalDT
-                    if turret.searchingAngle < turret.objectiveSearchingAngle then
-                        turret.searchingAngle = turret.objectiveSearchingAngle
-                    end
-                else
-                    turret.searchWait.current = turret.searchWait.current + 1 * GlobalDT
-                    if turret.searchWait.current >= turret.searchWait.max then
-                        turret.objectiveSearchingAngle = math.random(-360, 360)
-                        turret.searchWait.current = 0
-                        turret.searchWait.max = math.random(100, 300)
-                    end
-                end
-            end
-        end
-
-        if TurretGlobalData.threatUpdateInterval.current >= TurretGlobalData.threatUpdateInterval.max then
-            if IdentifyIfTurretIsAThreat(turret) then
-                MarkTurretAsThreat(turret)
-            else
-                turret.threat.on = false
-            end
-        end
-
-        -- warbling
-        local maxWarbleHearing = 2000
-        if turret.warble == nil then turret.warble = { current = 0, max = math.random(TurretGlobalData.warble.min, TurretGlobalData.warble.max) } end
-        turret.warble.current = turret.warble.current + 1
-        if turret.warble.current >= turret.warble.max then
-            turret.warble.current = 0
-            turret.warble.max = math.random(TurretGlobalData.warble.min, TurretGlobalData.warble.max)
-            PlaySFX(lume.randomchoice(SFX.warble), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
-            NewMessage("~", turret.x, turret.y - TurretGlobalData.headRadius - 40, {1,1,1}, 100, Fonts.medium)
-        end
-
-        ::continue::
-    end
-
-    if TurretGlobalData.threatUpdateInterval.current >= TurretGlobalData.threatUpdateInterval.max then
-        TurretGlobalData.threatUpdateInterval.current = 0
-    end
-end
-function DrawTurrets()
-    for _, turret in ipairs(Turrets) do
-        if turret.notMinimapVisible and Minimap.showing and GameState == "game" then goto continue end
-        if not turret.discovered then goto continue end
-
-        if turret.type == "normal" then
-            love.graphics.setColor(0,.3,1)
-            love.graphics.setLineWidth(2)
-        elseif turret.type == "laser" then
-            love.graphics.setColor(1,.5,0)
-            love.graphics.setLineWidth(5)
-        elseif turret.type == "drag" then
-            love.graphics.setColor(1,1,0)
-            love.graphics.setLineWidth(5)
-        end
-
-        love.graphics.circle("fill", turret.x, turret.y, TurretGlobalData.headRadius * (Minimap.showing and 2 or 1), 100)
-
-        local alpha = .5
-        if turret.type == "normal" then
-            love.graphics.setColor(0,1,0, alpha)
-        elseif turret.type == "laser" then
-            love.graphics.setColor(1,.5,0, alpha)
-        elseif turret.type == "drag" then
-            love.graphics.setColor(1,1,0, alpha)
-        end
-
-        if turret.seesPlayer then
-            local r, g, b = love.graphics.getColor()
-            love.graphics.setColor(r, g, b, turret.fireRate.current / turret.fireRate.max)
-
-            love.graphics.line(turret.x, turret.y, Player.centerX + (math.random()-math.random()) * 3, Player.centerY + (math.random()-math.random()) * 3)
-        else
-            local x2 = math.sin(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.x
-            local y2 = math.cos(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.y
-
-            love.graphics.line(turret.x, turret.y, x2, y2)
-        end
-
-        DrawThreatBox(turret)
-
-        ::continue::
-    end
-end
-function DisplayTurretInfo()
-    for _, turret in ipairs(Turrets) do
-        local mx, my = love.graphics.inverseTransformPoint(love.mouse.getX(), love.mouse.getY())
-        if Distance(turret.x, turret.y, mx, my) <= TurretGlobalData.readingsDistance then
-            love.graphics.setColor(0,1,0)
-            love.graphics.setLineWidth(2)
-            love.graphics.circle("line", turret.x, turret.y, turret.viewRadius)
-            love.graphics.setFont(Fonts.normal)
-            love.graphics.print("fire interval: " .. turret.fireRate.max, turret.x + TurretGlobalData.headRadius + 5, turret.y)
-        end
-    end
-end
-function ExplodeTurret(turret)
-    -- particles
-    for _ = 1, 15 do
-        table.insert(Particles, NewParticle(turret.x, turret.y, math.random() * 5 + 4, Player.color, math.random() * 4 + 3, math.random(360), 0.02, math.random(300, 500)))
-    end
-
-    lume.remove(Turrets, turret)
-    PlaySFX(SFX.smash, 0.5, 1.5)
-end
-function IdentifyIfTurretIsAThreat(turret)
-    if turret.fireRate.max <= Lerp(TurretGlobalData.fireInterval.min, TurretGlobalData.fireInterval.max, 1/4) and
-    ToMeters(Distance(turret.x, turret.y, Player.centerX, Player.centerY)) <= 5 then
-        return true
-    end
-
-    return false
-end
-function MarkTurretAsThreat(turret)
-    love.graphics.push()
-
-    love.graphics.origin()
-
-    local x, y = love.graphics.inverseTransformPoint(turret.x, turret.y)
-
-    local randomness = 5
-    turret.threat.x = x - TurretGlobalData.threatWidth / 2 + (math.random()-math.random())*randomness
-    turret.threat.y = y - TurretGlobalData.threatHeight / 2 + (math.random()-math.random())*randomness
-
-    turret.threat.on = true
-
-    love.graphics.pop()
-end
-function DrawThreatBox(turret)
-    if not turret.threat.on then return end
-
-    love.graphics.push()
-    --love.graphics.origin()
-
-    local x, y = turret.threat.x, turret.threat.y
-
-    local spacing = 5
-    love.graphics.setLineWidth(3)
-    love.graphics.setColor(1,0,0)
-    love.graphics.rectangle("line", x, y, TurretGlobalData.threatWidth, TurretGlobalData.threatHeight)
-    love.graphics.setFont(Fonts.normal)
-    love.graphics.print("threat", x + spacing, y - Fonts.normal:getHeight() - spacing)
-
-    love.graphics.pop()
 end
 
 function SpawnCheckpoints()
@@ -2775,7 +2571,9 @@ function OpenUpgradeMenu()
     if Level >= UpgradeData.startGettingUpgradesOnLevel and Level % UpgradeData.upgradeInterval == 0 then
         UpgradeData.picking = true
         PlaySFX(SFX.upgradeMenu, 0.7, 1)
+        return true
     end
+    return false
 end
 function DrawUpgradeMenuOverlay()
     love.graphics.setColor(0,0,0, 0.5)
@@ -2789,7 +2587,7 @@ function DrawUpgradeMenuOverlay()
     for index = 1, #Upgrades do
         local category = Upgrades[index].name
         local level = Upgrades[index].list[PlayerUpgrades[category]]
-        local text = string.upper(category) .. ": " .. string.upper(((level and level and PlayerUpgrades[category] < #Upgrades[index].list) .. " unlocked" or "not upgraded"))
+        local text = string.upper(category) .. ": " .. string.upper(((level and PlayerUpgrades[category] < #Upgrades[index].list) and level .. " unlocked" or "not upgraded"))
 
         DrawTextWithBackground(text,
         love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2), Fonts.medium, (level and {1,1,1} or {1,0,0}), {0,0,0})
@@ -2825,9 +2623,15 @@ function DrawCommandLineOverlay()
     end
 end
 function RunCommandLine()
-    table.insert(CommandLine.history, CommandLine.text)
-    lume.dostring(CommandLine.text)
-    CommandLine.text = ""
+    if not CommandLine.verified and love.data.encode("string", "hex", love.data.hash("sha512", CommandLine.text)) == "b59b33b84b8326aa576b78cb689e5fc288b3d1c0ced2a23bb9ccff0aa0c99a20e43c9126d6d371a92ca87dc4c110eebdeb3e2e9457a1793fa15c0a4b12d197d7" then
+        CommandLine.text = ""
+        table.insert(CommandLine.history, "VERIFIED. Welcome, Frazy.")
+        CommandLine.verified = true
+    elseif CommandLine.verified then
+        table.insert(CommandLine.history, CommandLine.text)
+        lume.dostring(CommandLine.text)
+        CommandLine.text = ""
+    end
 end
 function Print(text)
     table.insert(CommandLine.history, "> " .. text)
@@ -2862,10 +2666,12 @@ function DrawDebug()
     end
 
     love.graphics.setColor(0,1,0)
+    love.graphics.setFont(Fonts.normal)
     love.graphics.printf(
         "Hooligans " .. enemiesRendered ..
         "\nObjs " .. objsRendered ..
         "\nTurrets " .. turretsRendered ..
+        "\nParticles " .. #Particles ..
         "\nAvg DT ms: " .. math.floor(love.timer.getAverageDelta() * 100 * 1000) / 100,
 
         5, 200, love.graphics.getWidth(), "left"
@@ -2877,4 +2683,26 @@ function SaveFrames()
         SaveData()
         LoadData()
     end
+end
+
+function UpdateMovables()
+    local data = love.thread.getChannel("turrets"):pop()
+    if data then
+        Turrets = data
+    end
+
+    local data = love.thread.getChannel("enemies"):pop()
+    if data then
+        Enemies = data
+    end
+
+    UpdateTurrets()
+    UpdateEnemies()
+    CheckCollisionWithCheckpoints()
+
+    love.thread.getChannel("turrets to thread"):push(Turrets)
+    love.thread.getChannel("turrets to thread player"):push(Player)
+
+    love.thread.getChannel("enemies to thread"):push(Enemies)
+    love.thread.getChannel("enemies to thread player"):push(Player)
 end

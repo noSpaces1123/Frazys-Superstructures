@@ -1,3 +1,32 @@
+function StartEnemyUpdateThread()
+    EnemyUpdateThread = love.thread.newThread([[
+
+Enemies, Player = ...
+
+function Distance(x1, y1, x2, y2)
+    return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+end
+
+while true do
+    local dataBack = love.thread.getChannel("enemies to thread"):demand()
+    Player = love.thread.getChannel("enemies to thread player"):demand()
+
+    Enemies = dataBack
+
+    for _, enemy in ipairs(Enemies) do
+        if Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2) <= Player.renderDistance then
+            enemy.render = true
+        end
+    end
+
+    love.thread.getChannel("enemies"):supply(Enemies)
+end
+
+    ]])
+
+    EnemyUpdateThread:start(Enemies, Player)
+end
+
 function SpawnEnemies()
     Enemies = {}
 
@@ -45,7 +74,7 @@ end
 
 function UpdateEnemies()
     for index, enemy in ipairs(Enemies) do
-        if not enemy.dead then
+        if enemy.render and not enemy.dead then
             local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
 
             local before = enemy.seesPlayer
