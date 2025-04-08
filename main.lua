@@ -2623,10 +2623,15 @@ function DrawCommandLineOverlay()
     end
 end
 function RunCommandLine()
-    if not CommandLine.verified and love.data.encode("string", "hex", love.data.hash("sha512", CommandLine.text)) == "b59b33b84b8326aa576b78cb689e5fc288b3d1c0ced2a23bb9ccff0aa0c99a20e43c9126d6d371a92ca87dc4c110eebdeb3e2e9457a1793fa15c0a4b12d197d7" then
-        CommandLine.text = ""
-        table.insert(CommandLine.history, "VERIFIED. Welcome, Frazy.")
-        CommandLine.verified = true
+    if not CommandLine.verified then
+        if love.data.encode("string", "hex", love.data.hash("sha512", CommandLine.text)) == "b59b33b84b8326aa576b78cb689e5fc288b3d1c0ced2a23bb9ccff0aa0c99a20e43c9126d6d371a92ca87dc4c110eebdeb3e2e9457a1793fa15c0a4b12d197d7" then
+            CommandLine.text = ""
+            table.insert(CommandLine.history, "VERIFIED. Welcome, Frazy.")
+            CommandLine.verified = true
+        else
+            CommandLine.text = ""
+            table.insert(CommandLine.history, "WRONG.")
+        end
     elseif CommandLine.verified then
         table.insert(CommandLine.history, CommandLine.text)
         lume.dostring(CommandLine.text)
