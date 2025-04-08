@@ -1001,31 +1001,17 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.2"
+    Version = "1.4.2.2"
     Changelog = Version ..
 [[
  Changelog:
 
-    Weather:
-    - New: Heat platforms do not spawn in rainy levels
-    - New: Icy platforms do not spawn in hot levels
-    - New: Rain drop particles in rainy levels
+    Minimap:
+    - Change: Made waypoints easier to remove
 
-    Upgrades:
-    - New: Added suit upgrade for water-proof checkpoints (level 3)
-
-    Turrets and hooligans:
-    - Fixed: Targeting indicator (line from threat to player) not rendering when the threat has not been discovered
-
-    Sticky platforms:
-    - Fixed: Not being able to super-jump off of sticky platforms
-
-    QoL:
-    - New: Self-destruct with [B]
-    - Removed: Level regeneration with [R] when paused
-
-    Performance:
-    - Enhanced: Significant performance enhancement, finally.
+    Bug fixes:
+    - Fixed: Descension level hooligan spawning not triggering
+    - Fixed: Upgrades not taking effect when moving to the next level
 ]]
 
     Debug = false
@@ -1062,6 +1048,8 @@ function love.update(dt)
                 if not Paused then
                     TimeOnThisLevel = TimeOnThisLevel + dt
 
+                    GetThreadData()
+
                     if not Descending.hooligmanCutscene.running then
                         UpdateParticles()
                         UpdateMovables()
@@ -1077,6 +1065,8 @@ function love.update(dt)
 
                     UpdateHooligmanCutscene()
                     UpdateHooligmanDialogue()
+
+                    SendThreadData()
                 end
 
                 --CheckForOddities()
@@ -1103,8 +1093,6 @@ function love.update(dt)
     end
 
     Player.centerX, Player.centerY = Player.x + Player.width / 2, Player.y + Player.height / 2
-
-    SaveFrames()
 end
 
 function love.draw()
@@ -1575,6 +1563,7 @@ function NextLevel()
         GenerateObjects()
         LoadPlayer()
         ApplyShrineEffects()
+        ApplyUpgrades()
 
         NextLevelAnimation.running = true
 
@@ -2440,6 +2429,9 @@ function InitialiseUpgrades()
         function () -- water-proof checkpoints
             Player.waterProofCheckpoints = true
         end,
+        function () -- faster super jump charging
+            Player.superJump.increase = 1.4
+        end,
         function () -- better traction
             Player.groundFriction = 1.3
         end,
@@ -2492,6 +2484,7 @@ function InitialiseUpgrades()
                 "stronger jump-pads",
                 "vault higher",
                 "water-proof checkpoints",
+                "faster super jump charging",
                 "better traction",
                 "better cooling",
                 "vault higher ii",
@@ -2683,31 +2676,26 @@ function DrawDebug()
     )
 end
 
-function SaveFrames()
-    if love.timer.getAverageDelta() > 0.07 and false then
-        SaveData()
-        LoadData()
-    end
-end
-
 function UpdateMovables()
-    local data = love.thread.getChannel("turrets"):pop()
-    if data then
-        Turrets = data
-    end
-
-    local data = love.thread.getChannel("enemies"):pop()
-    if data then
-        Enemies = data
-    end
-
     UpdateTurrets()
     UpdateEnemies()
     CheckCollisionWithCheckpoints()
+end
+function GetThreadData()
+    local dataTurrets = love.thread.getChannel("turrets"):pop()
+    if dataTurrets then
+        Turrets = dataTurrets
+    end
 
-    love.thread.getChannel("turrets to thread"):push(Turrets)
-    love.thread.getChannel("turrets to thread player"):push(Player)
+    local dataEnemies = love.thread.getChannel("enemies"):pop()
+    if dataEnemies then
+        Enemies = dataEnemies
+    end
+end
+function SendThreadData()
+    love.thread.getChannel("turrets to thread"):supply(Turrets)
+    love.thread.getChannel("player"):supply(Player)
 
-    love.thread.getChannel("enemies to thread"):push(Enemies)
-    love.thread.getChannel("enemies to thread player"):push(Player)
+    love.thread.getChannel("enemies to thread"):supply(Enemies)
+    love.thread.getChannel("player"):supply(Player)
 end

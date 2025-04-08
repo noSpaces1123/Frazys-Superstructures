@@ -14,7 +14,7 @@ function LoadPlayer()
         smashSpeedThreshold = 50,
         respawnWait = { current = 0, max = 200, dead = false },
         temperature = { current = 0, max = 500 }, passiveCooling = .4,
-        superJump = { current = 0, max = 1500, cost = 900, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
+        superJump = { increase = 1, current = 0, max = 1500, cost = 900, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
         checkpoint = { x = nil, y = nil },
         timeStill = 0, timeStillFocusDivisor = 200,
         renderDistance = ToPixels(10),
@@ -220,7 +220,7 @@ function love.mousepressed(mx, my, button)
             local x, y = love.graphics.inverseTransformPoint(mx, my)
 
             for _, waypoint in ipairs(WayPoints) do
-                if Distance(waypoint.x, waypoint.y, x, y) <= waypoint.radius then
+                if Distance(waypoint.x, waypoint.y, x, y) <= waypoint.radius * 5 then
                     lume.remove(WayPoints, waypoint)
                     goto removedWayPoint
                 end
@@ -783,7 +783,8 @@ function UpdatePlayerSuperJumpBar()
     if Player.superJump.current >= Player.superJump.max then
         Player.superJump.current = Player.superJump.max
     else
-        Player.superJump.current = Player.superJump.current + 1 * GlobalDT
+        if Player.superJump.increase == nil then Player.superJump.increase = 1 end
+        Player.superJump.current = Player.superJump.current + Player.superJump.increase * GlobalDT
     end
 end
 function DrawPlayerSuperJumpBar()

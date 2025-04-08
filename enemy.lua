@@ -9,7 +9,7 @@ end
 
 while true do
     local dataBack = love.thread.getChannel("enemies to thread"):demand()
-    Player = love.thread.getChannel("enemies to thread player"):demand()
+    Player = love.thread.getChannel("player"):demand()
 
     Enemies = dataBack
 
