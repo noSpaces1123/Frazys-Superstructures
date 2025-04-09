@@ -1007,12 +1007,12 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.3.1"
+    Version = "1.4.3.2"
     Changelog = Version ..
 [[
  Changelog:
 
-    - Fixed: Random crashing (for real this time)
+    - Fixed: Random crashing (for real for real this time)
 ]]
 
     Debug = false
@@ -2705,12 +2705,16 @@ end
 function GetThreadData()
     local dataTurrets = love.thread.getChannel("turrets"):pop()
     if dataTurrets then
-        Turrets = dataTurrets
+        for index, data in ipairs(dataTurrets) do
+            if Turrets[index] then Turrets[index].render = data.render end
+        end
     end
 
     local dataEnemies = love.thread.getChannel("enemies"):pop()
     if dataEnemies then
-        Enemies = dataEnemies
+        for index, data in ipairs(dataEnemies) do
+            if Enemies[index] then Enemies[index].render = data.render end
+        end
     end
 end
 function SendThreadData()
