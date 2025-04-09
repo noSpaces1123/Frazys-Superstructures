@@ -1007,22 +1007,12 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.3"
+    Version = "1.4.3.1"
     Changelog = Version ..
 [[
  Changelog:
 
-    Timer:
-    - Fixed: Timer still counting up when dead
-
-    Weather:
-    - Change: "Looks like checkpoints don't work in the rain" dialogue no longer able to be triggered more than once
-
-    OTHER:
-    - Fixed: Fading in animation on game startup trailing into entering the game
-    - New: Added game icon
-    - Fixed: Random crashing
-    - Fixed: Hooligans and turrets not being cleared and regenerated each level
+    - Fixed: Random crashing (for real this time)
 ]]
 
     Debug = false
@@ -2729,9 +2719,9 @@ function SendThreadData()
         return
     end
 
-    love.thread.getChannel("turrets to thread"):supply(Turrets)
-    love.thread.getChannel("player"):supply(Player)
+    love.thread.getChannel("turrets to thread"):push(Turrets)
+    love.thread.getChannel("player"):push(Player)
 
-    love.thread.getChannel("enemies to thread"):supply(Enemies)
-    love.thread.getChannel("player"):supply(Player)
+    love.thread.getChannel("enemies to thread"):push(Enemies)
+    love.thread.getChannel("player"):push(Player)
 end
