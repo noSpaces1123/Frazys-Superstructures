@@ -1007,12 +1007,13 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.3.2"
+    Version = "1.4.3.3"
     Changelog = Version ..
 [[
  Changelog:
 
-    - Fixed: Random crashing (for real for real this time)
+    - Fixed: Crash enemy.lua:71 (getting confused about missing data)
+    - Change: Changed game icon
 ]]
 
     Debug = false

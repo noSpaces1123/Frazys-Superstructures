@@ -47,6 +47,8 @@ end
 function DrawEnemies()
     for _, enemy in ipairs(Enemies) do
         if not enemy.dead and enemy.discovered and ((not Minimap.showing and Distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) then
+            if not enemy.shortCircuit then enemy.shortCircuit = { current = 0, max = 0, running = false } end
+
             love.graphics.setColor(1,0,0)
             love.graphics.rectangle("fill", enemy.x, enemy.y, enemy.width, enemy.width)
 
