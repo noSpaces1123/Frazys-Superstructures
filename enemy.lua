@@ -67,7 +67,18 @@ function DrawEnemies()
             end
 
             love.graphics.setColor(0,0,0)
-            love.graphics.rectangle("fill", eyeX - eyeWidth / 2, eyeY - eyeWidth / 2, eyeWidth, eyeWidth)
+
+            if enemy.shortCircuit.running then
+                eyeWidth = eyeWidth / 4
+                multiply = enemy.width / 4
+                for _ = 1, 3 do
+                    angle = math.rad(math.random(360))
+                    eyeX, eyeY = enemy.x + enemy.width / 2 + math.sin(angle) * multiply, enemy.y + enemy.width / 2 + math.cos(angle) * multiply
+                    love.graphics.rectangle("fill", eyeX - eyeWidth / 2, eyeY - eyeWidth / 2, eyeWidth, eyeWidth)
+                end
+            else
+                love.graphics.rectangle("fill", eyeX - eyeWidth / 2, eyeY - eyeWidth / 2, eyeWidth, eyeWidth)
+            end
         end
     end
 end
@@ -75,6 +86,8 @@ end
 function UpdateEnemies()
     for index, enemy in ipairs(Enemies) do
         if enemy.render and not enemy.dead then
+            if not enemy.shortCircuit then enemy.shortCircuit = { current = 0, max = 0, running = false } end
+
             local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
 
             local before = enemy.seesPlayer
@@ -88,7 +101,7 @@ function UpdateEnemies()
             end
 
             if distance <= Player.renderDistance then
-                if not Player.respawnWait.dead and not NextLevelAnimation.running then
+                if not Player.respawnWait.dead and not NextLevelAnimation.running and not enemy.shortCircuit.running then
                     if enemy.seesPlayer then
                         Player.targeted = true
 
@@ -134,6 +147,42 @@ function UpdateEnemies()
                     enemy.warble.max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max)
                     PlaySFX(lume.randomchoice(SFX.enemySpeak), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
                     NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 100, Fonts.medium, index)
+                end
+            end
+
+            -- short circuit
+            if Weather.currentType == "rainy" and not enemy.shortCircuit.running then
+                if math.random() < Weather.strength / 100 then
+                    enemy.shortCircuit.running = true
+                    enemy.shortCircuit.max = math.random(EnemyGlobalData.shortCircuitTime.min, EnemyGlobalData.shortCircuitTime.max)
+
+                    local maxHearingDistance = ToPixels(5)
+                    PlaySFX(lume.randomchoice(SFX.shortCircuit), .2 * Clamp(1 - distance / maxHearingDistance, 0, 1), math.random()/20+.9)
+
+                    for _ = 1, 8 do
+                        local degrees = math.random(360)
+                        local radius = math.random() * 2 + 2
+                        local speed = math.random() * 5 + 2
+                        local decay = math.random(400, 600)
+                        table.insert(Particles, NewParticle(enemy.x+enemy.width/2, enemy.y+enemy.width/2, radius, {1,0,0,math.random()/2+.5}, speed, degrees, 0.01, decay,
+                        function (self)
+                            self.degrees = self.degrees + Jitter(60)
+                            if self.speed > 0 then
+                                self.speed = self.speed - 0.02 * GlobalDT
+                                if self.speed <= 0 then
+                                    self.speed = 0
+                                end
+                            end
+                        end))
+                    end
+                end
+            end
+
+            if enemy.shortCircuit.running then
+                enemy.shortCircuit.current = enemy.shortCircuit.current + 1 * GlobalDT
+                if enemy.shortCircuit.current >= enemy.shortCircuit.max then
+                    enemy.shortCircuit.current = enemy.shortCircuit.current - enemy.shortCircuit.max
+                    enemy.shortCircuit.running = false
                 end
             end
         end

@@ -307,7 +307,7 @@ function DrawPlayer()
     end
     for _, enemy in ipairs(Enemies) do
         local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
-        if distance < closestDistance then
+        if not enemy.dead and distance < closestDistance then
             closestDistance = distance
             toX, toY = enemy.x + enemy.width / 2, enemy.y + enemy.width / 2
         end
@@ -759,6 +759,10 @@ function KillPlayer()
     SaveData()
 
     PlaySFX(SFX.death, 0.7, 1)
+
+    Paused = false
+    SlowMo.running = false
+    SlowMo.current = 0
 end
 function UpdatePlayerRespawnWait()
     if not Player.respawnWait.dead then return end
@@ -875,7 +879,11 @@ function CheckCollisionWithCheckpoints()
                 if not sfxIsPlaying then
                     PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
 
-                    PlayDialogue(57)
+                    local dialogueIndex = 57
+                    if not Dialogue.list[dialogueIndex].done then
+                        PlayDialogue(dialogueIndex)
+                        Dialogue.list[dialogueIndex].done = true
+                    end
 
                     for _ = 1, 20 do
                         local degrees = math.random(360)

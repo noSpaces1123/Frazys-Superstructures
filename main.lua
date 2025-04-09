@@ -11,7 +11,7 @@ function love.load()
 
     NameOfTheGame = "Frazy's Superstructures"
 
-    love.window.updateMode(love.graphics.getWidth(), love.graphics.getHeight(), {highdpi=true, vsync=true})
+    love.window.updateMode(love.graphics.getWidth(), love.graphics.getHeight())
     love.window.setTitle(NameOfTheGame)
     love.window.setFullscreen(true)
 
@@ -60,6 +60,11 @@ function love.load()
         warble = {
             love.audio.newSource("assets/sfx/warble.wav", "static"),
             love.audio.newSource("assets/sfx/warble2.wav", "static"),
+        },
+        shortCircuit = {
+            love.audio.newSource("assets/sfx/short circuit.wav", "static"),
+            love.audio.newSource("assets/sfx/short circuit2.wav", "static"),
+            love.audio.newSource("assets/sfx/short circuit3.wav", "static"),
         },
         enemySpeak = {},
     }
@@ -183,6 +188,7 @@ function love.load()
         airFriction = 0.05,
         minSpeedAgainstWallToDie = 32,
         warble = { min = 1000, max = 4000 },
+        shortCircuitTime = { min = 60, max = 120 },
         voiceLines = {
             "*(#(!(",
             "!@*)(#*)#(!",
@@ -929,7 +935,7 @@ function love.load()
     Bubs = {}
 
     Buttons = {}
-    InitialiseButtons()
+    InitialiseMenuButtons()
     InitialiseBlackjackButtons()
 
     InitialiseUpgrades()
@@ -1001,17 +1007,22 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.2.2"
+    Version = "1.4.3"
     Changelog = Version ..
 [[
  Changelog:
 
-    Minimap:
-    - Change: Made waypoints easier to remove
+    Timer:
+    - Fixed: Timer still counting up when dead
 
-    Bug fixes:
-    - Fixed: Descension level hooligan spawning not triggering
-    - Fixed: Upgrades not taking effect when moving to the next level
+    Weather:
+    - Change: "Looks like checkpoints don't work in the rain" dialogue no longer able to be triggered more than once
+
+    OTHER:
+    - Fixed: Fading in animation on game startup trailing into entering the game
+    - New: Added game icon
+    - Fixed: Random crashing
+    - Fixed: Hooligans and turrets not being cleared and regenerated each level
 ]]
 
     Debug = false
@@ -1026,6 +1037,8 @@ function love.load()
 
     StartEnemyUpdateThread()
     StartTurretUpdateThread()
+
+    CancelNextThreadSupply = false
 end
 
 function love.update(dt)
@@ -1046,7 +1059,7 @@ function love.update(dt)
                 UpdateNextLevelAnimation()
 
                 if not Paused then
-                    TimeOnThisLevel = TimeOnThisLevel + dt
+                    if not Player.respawnWait.dead then TimeOnThisLevel = TimeOnThisLevel + dt end
 
                     GetThreadData()
 
@@ -1381,6 +1394,7 @@ function GenerateObjects()
     }
     Turrets = {}
     Shrines = {}
+    Bullets = {}
 
     math.randomseed(Seed)
     for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
@@ -1421,12 +1435,17 @@ function GenerateObjects()
         table.remove(Objects, index - (loops - 1))
     end
 
+    GetThreadData()
+
     SpawnTurrets(playerSafeArea)
     SpawnCheckpoints()
     if Dialogue.list[25].done or true then SpawnShrines() end
     SpawnEnemies()
     SpawnBubs()
     GenerateBG()
+
+    SendThreadData()
+    CancelNextThreadSupply = true
 
     StartWeather()
 end
@@ -1444,6 +1463,8 @@ function GetObjectTypeFromPerlinNoise(x, y)
     end
 end
 function DiscoverAndRenderDiscoverables()
+    if NextLevelAnimation.running then return end
+
     for _, obj in ipairs(Objects) do
         love.graphics.push()
         InitialiseRegularCoordinateAlterations()
@@ -1830,8 +1851,8 @@ function DrawDisplays()
         end
 
         love.graphics.setFont(Fonts.normal)
-        text = text .. math.floor(ToMeters(math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) ..
-        " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Player.checkpoint.y))) or "nil") ..
+        text = text .. math.floor(ToMeters(Boundary.height - math.abs(Player.y))) .. " / " .. ToMeters(Boundary.height) ..
+        " m | checkpoint at: " .. (Player.checkpoint.y and math.floor(ToMeters(math.abs(Boundary.height - Player.checkpoint.y))) or "nil") ..
         " | temperature: " .. math.floor(Player.temperature.current / Player.temperature.max * 100) .. "%" ..
         " | weather: " .. Weather.currentType .. (Weather.currentType ~= "clear" and ", Class " .. weatherClass or "")
 
@@ -1855,6 +1876,8 @@ function DrawDisplays()
             lilLine(-i)
         end
     end
+
+    text = text .. "\ntotal time: " .. TimeInSecondsToStupidFuckingHumanFormat(TotalTime + TimeOnThisLevel)
 
     love.graphics.setColor(0,1,0)
     love.graphics.setFont(Fonts.normal)
@@ -2309,13 +2332,14 @@ function Jitter(amplitude)
     return (math.random()-math.random())*amplitude
 end
 
-function InitialiseButtons()
+function InitialiseMenuButtons()
     local width = 300
     local CENTERX, CENTERY = love.graphics.getWidth() / 2, love.graphics.getHeight() / 2
 
     -- main menu
     NewButton("Begin", CENTERX - width / 2, CENTERY + 100, width, 80, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.big, 2, 10,10, function (self)
         GameState = "game"
+        MenuAnimation.overlay = 1
         LoadData()
     end, nil, function (self)
         return GameState == "menu"
@@ -2627,7 +2651,14 @@ function RunCommandLine()
         end
     elseif CommandLine.verified then
         table.insert(CommandLine.history, CommandLine.text)
-        lume.dostring(CommandLine.text)
+
+        if CommandLine.text == "LOG OUT" then
+            CommandLine.verified = false
+            CommandLine.history = {CommandLine.history[1]}
+        else
+            lume.dostring(CommandLine.text)
+        end
+
         CommandLine.text = ""
     end
 end
@@ -2693,6 +2724,11 @@ function GetThreadData()
     end
 end
 function SendThreadData()
+    if CancelNextThreadSupply then
+        CancelNextThreadSupply = false
+        return
+    end
+
     love.thread.getChannel("turrets to thread"):supply(Turrets)
     love.thread.getChannel("player"):supply(Player)
 
