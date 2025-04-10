@@ -88,7 +88,7 @@ function UpdatePlayer()
 
     if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running and not CommandLine.typing then
         Player.yvelocity = ApplyGravity(Player)
-        Player.xvelocity = ApplyWind()
+        Player.xvelocity = ApplyWind(Player.xvelocity)
 
         UpdatePlayerCoyote()
         DoPlayerSpeedParticles()

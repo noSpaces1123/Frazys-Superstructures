@@ -152,7 +152,7 @@ function UpdateEnemies()
                 end
             end
 
-            enemy.xvelocity = ApplyWind()
+            enemy.xvelocity = ApplyWind(enemy.xvelocity)
 
             -- short circuit
             if Weather.currentType == "rainy" and not enemy.shortCircuit.running then
