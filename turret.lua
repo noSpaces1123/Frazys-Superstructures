@@ -46,6 +46,13 @@ function SpawnTurrets(playerSafeArea)
     end
 end
 function NewTurret(x, y, fireInterval, notOnMap)
+    local palette = TurretGenerationPalette
+    if Weather.currentType == "rainy" then
+        palette.drag = 0
+    else
+        palette.push = 0
+    end
+
     table.insert(Turrets, {
         x = x, y = y, viewRadius = math.random(TurretGlobalData.viewRadius.min, TurretGlobalData.viewRadius.max),
         fireRate = { current = 0, max = fireInterval }, seesPlayer = false, searchingAngle = math.random(-360, 360), objectiveSearchingAngle = math.random(-360, 360),
@@ -96,6 +103,21 @@ function UpdateTurrets()
                         turret.fireRate.current = 0
                         PlaySFX(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
                         DragPlayerTowards(turret.x, turret.y, 10)
+                    elseif turret.type == "push" then
+                        if not SFX.push:isPlaying() then PlaySFX(SFX.push, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5) end
+
+                        DragPlayerTowards(turret.x, turret.y, -0.7 * GlobalDT)
+
+                        table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*3+2, {1,0,.7,math.random()/2+.5}, 2, math.random(360), 0, 300,
+                        function (self)
+                            self.degrees = self.degrees + Jitter(60)
+                            if self.speed > 0 then
+                                self.speed = self.speed - 0.02 * GlobalDT
+                                if self.speed <= 0 then
+                                    self.speed = 0
+                                end
+                            end
+                        end))
                     end
                 end
             else
@@ -179,6 +201,9 @@ function DrawTurrets()
         elseif turret.type == "drag" then
             love.graphics.setColor(1,1,0)
             love.graphics.setLineWidth(5)
+        elseif turret.type == "push" then
+            love.graphics.setColor(1,0,.7)
+            love.graphics.setLineWidth(3)
         end
 
         love.graphics.circle("fill", turret.x, turret.y, TurretGlobalData.headRadius * (Minimap.showing and 2 or 1), 100)
@@ -190,13 +215,26 @@ function DrawTurrets()
             love.graphics.setColor(1,.5,0, alpha)
         elseif turret.type == "drag" then
             love.graphics.setColor(1,1,0, alpha)
+        elseif turret.type == "push" then
+            alpha = .2
+            love.graphics.setColor(1,0,.7, alpha * math.random())
         end
 
         if turret.seesPlayer then
             local r, g, b = love.graphics.getColor()
             love.graphics.setColor(r, g, b, turret.fireRate.current / turret.fireRate.max)
 
-            love.graphics.line(turret.x, turret.y, Player.centerX + (math.random()-math.random()) * 3, Player.centerY + (math.random()-math.random()) * 3)
+            local drawLine = function (amplitude)
+                love.graphics.line(turret.x, turret.y, Player.centerX + Jitter(amplitude), Player.centerY + Jitter(amplitude))
+            end
+
+            if turret.type == "push" then
+                for _ = 1, 4 do
+                    drawLine(13)
+                end
+            else
+                drawLine(3)
+            end
         else
             local x2 = math.sin(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.x
             local y2 = math.cos(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.y

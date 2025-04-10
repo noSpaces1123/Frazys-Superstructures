@@ -52,6 +52,10 @@ function love.load()
         blackjackSpotOn = love.audio.newSource("assets/sfx/blackjack spot-on.wav", "static"),
         rain = love.audio.newSource("assets/sfx/rain.mp3", "static"),
         selfDestruct = love.audio.newSource("assets/sfx/self destruct.wav", "static"),
+        push = love.audio.newSource("assets/sfx/push.wav", "static"),
+        wind = love.audio.newSource("assets/sfx/wind.wav", "static"),
+        windWarning = love.audio.newSource("assets/sfx/wind warning.wav", "static"),
+        windOver = love.audio.newSource("assets/sfx/wind over.wav", "static"),
         checkpointFizzleOut = {
             love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
             love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
@@ -412,7 +416,7 @@ function love.load()
     InitialiseWeather()
 
     WeatherPalette = { clear = 3, rainy = 3, hot = 3 }
-    TurretGenerationPalette = { normal = 20, laser = 4, drag = 2 }
+    TurretGenerationPalette = { normal = 20, laser = 4, drag = 2, push = 6 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
         ["Will of the Frogman"] = 5,
@@ -1007,13 +1011,16 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.4.3.3"
+    Version = "1.5"
     Changelog = Version ..
 [[
  Changelog:
 
-    - Fixed: Crash enemy.lua:71 (getting confused about missing data)
-    - Change: Changed game icon
+    Turrets:
+    - New: Push turrets
+
+    Weather:
+    - New: Added wind events to rainy levels
 ]]
 
     Debug = false

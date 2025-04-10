@@ -2,6 +2,11 @@ function InitialiseWeather()
     Weather = {
         currentType = "clear",
         strength = 0, -- real number from 0 to 1
+        windEvents = {
+            strength = 1, maxStrength = 0.3,
+            duration = 0, maxDuration = 2000,
+            current = 0, max = 3000,
+        },
         types = {
             -- clear weather has no effects.
             clear = {
@@ -28,6 +33,27 @@ function InitialiseWeather()
                             for _ = 1, 6, 1 do
                                 table.insert(Particles, NewParticle(x, y, math.random() * 2, {1,1,1,math.random()/2+.6}, math.random()*2+.5, math.random(160, 200), 0.06, math.random(100, 160)))
                             end
+                        end
+                    end
+
+                    Weather.windEvents.current = Weather.windEvents.current + 1 * GlobalDT
+                    if Weather.windEvents.current >= Weather.windEvents.max then
+                        Weather.windEvents.current = 0
+                        Weather.windEvents.strength = lume.randomchoice({ -Weather.windEvents.maxStrength, Weather.windEvents.maxStrength }) * Weather.strength
+                        Weather.windEvents.duration = Weather.windEvents.maxDuration * Weather.strength
+
+                        PlaySFX(SFX.wind, 0.4, 1)
+                        PlaySFX(SFX.windWarning, 0.2, 1)
+
+                        NewMessage("WIND EVENT " .. (Weather.windEvents.strength > 0 and "EASTWARD" or "WESTWARD"), 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
+                    end
+
+                    if Weather.windEvents.duration > 0 then
+                        Weather.windEvents.duration = Weather.windEvents.duration - 1 * GlobalDT
+
+                        if Weather.windEvents.duration <= 0 then
+                            PlaySFX(SFX.windOver, 0.2, 1)
+                            NewMessage("WIND EVENT OVER", 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
                         end
                     end
                 end,
@@ -97,8 +123,11 @@ function DrawWeatherOverlay()
 
         for _ = 1, Weather.strength * 300 do
             love.graphics.setColor(1,1,1, math.random()*0.4)
+
             local x, y = math.random(0, love.graphics.getWidth()), math.random(0, love.graphics.getHeight())
-            love.graphics.line(x, y, x, y + Weather.strength * 10 + 20)
+            local x2 = x + (Weather.windEvents.duration > 0 and Weather.windEvents.strength or 0) * 45
+
+            love.graphics.line(x, y, x2, y + Weather.strength * 10 + 20)
         end
     elseif Weather.currentType == "hot" then
         love.graphics.setBlendMode("add", "alphamultiply")
@@ -117,4 +146,9 @@ function UpdateWeather()
     if Weather.types[Weather.currentType].update ~= nil then
         Weather.types[Weather.currentType].update(Weather.types[Weather.currentType])
     end
+end
+
+function ApplyWind()
+    if Weather.currentType ~= "rainy" or Weather.windEvents.duration <= 0 then return end
+    Player.xvelocity = Player.xvelocity + Weather.windEvents.strength
 end
