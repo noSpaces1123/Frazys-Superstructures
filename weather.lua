@@ -151,6 +151,6 @@ function UpdateWeather()
 end
 
 function ApplyWind(xvelocity)
-    if Weather.currentType ~= "rainy" or Weather.windEvents.duration <= 0 then return end
+    if Weather.currentType ~= "rainy" or Weather.windEvents.duration <= 0 then return xvelocity end
     return xvelocity + Weather.windEvents.strength
 end
