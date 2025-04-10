@@ -103,6 +103,8 @@ function UpdateEnemies()
             end
 
             if distance <= Player.renderDistance then
+                enemy.xvelocity = ApplyWind(enemy.xvelocity)
+
                 if not Player.respawnWait.dead and not NextLevelAnimation.running and not enemy.shortCircuit.running then
                     if enemy.seesPlayer then
                         Player.targeted = true
@@ -151,8 +153,6 @@ function UpdateEnemies()
                     NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 100, Fonts.medium, index)
                 end
             end
-
-            enemy.xvelocity = ApplyWind(enemy.xvelocity)
 
             -- short circuit
             if Weather.currentType == "rainy" and not enemy.shortCircuit.running then
