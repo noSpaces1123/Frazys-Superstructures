@@ -36,24 +36,26 @@ function InitialiseWeather()
                         end
                     end
 
-                    Weather.windEvents.current = Weather.windEvents.current + 1 * GlobalDT
-                    if Weather.windEvents.current >= Weather.windEvents.max then
-                        Weather.windEvents.current = 0
-                        Weather.windEvents.strength = lume.randomchoice({ -Weather.windEvents.maxStrength, Weather.windEvents.maxStrength }) * Weather.strength
-                        Weather.windEvents.duration = Weather.windEvents.maxDuration * Weather.strength
+                    if Weather.strength >= 0.5 then
+                        Weather.windEvents.current = Weather.windEvents.current + 1 * GlobalDT
+                        if Weather.windEvents.current >= Weather.windEvents.max then
+                            Weather.windEvents.current = 0
+                            Weather.windEvents.strength = lume.randomchoice({ -Weather.windEvents.maxStrength, Weather.windEvents.maxStrength }) * Weather.strength
+                            Weather.windEvents.duration = Weather.windEvents.maxDuration * Weather.strength
 
-                        PlaySFX(SFX.wind, 0.4, 1)
-                        PlaySFX(SFX.windWarning, 0.2, 1)
+                            PlaySFX(SFX.wind, 0.4, 1)
+                            PlaySFX(SFX.windWarning, 0.2, 1)
 
-                        NewMessage("WIND EVENT " .. (Weather.windEvents.strength > 0 and "EASTWARD" or "WESTWARD"), 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
-                    end
+                            NewMessage("WIND EVENT " .. (Weather.windEvents.strength > 0 and "EASTWARD" or "WESTWARD"), 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
+                        end
 
-                    if Weather.windEvents.duration > 0 then
-                        Weather.windEvents.duration = Weather.windEvents.duration - 1 * GlobalDT
+                        if Weather.windEvents.duration > 0 then
+                            Weather.windEvents.duration = Weather.windEvents.duration - 1 * GlobalDT
 
-                        if Weather.windEvents.duration <= 0 then
-                            PlaySFX(SFX.windOver, 0.2, 1)
-                            NewMessage("WIND EVENT OVER", 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
+                            if Weather.windEvents.duration <= 0 then
+                                PlaySFX(SFX.windOver, 0.2, 1)
+                                NewMessage("WIND EVENT OVER", 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
+                            end
                         end
                     end
                 end,
@@ -148,7 +150,7 @@ function UpdateWeather()
     end
 end
 
-function ApplyWind()
+function ApplyWind(xvelocity)
     if Weather.currentType ~= "rainy" or Weather.windEvents.duration <= 0 then return end
-    Player.xvelocity = Player.xvelocity + Weather.windEvents.strength
+    return xvelocity + Weather.windEvents.strength
 end

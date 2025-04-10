@@ -152,6 +152,8 @@ function UpdateEnemies()
                 end
             end
 
+            enemy.xvelocity = ApplyWind()
+
             -- short circuit
             if Weather.currentType == "rainy" and not enemy.shortCircuit.running then
                 if math.random() < Weather.strength / 100 then
