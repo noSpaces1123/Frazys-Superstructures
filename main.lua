@@ -113,6 +113,7 @@ function love.load()
     Fonts = {
         normal =      love.graphics.newFont(fontDirectory.."Regular.ttf", 11),
         small =       love.graphics.newFont(fontDirectory.."Regular.ttf", 9),
+        changelog =   love.graphics.newFont(fontDirectory.."Regular.ttf", 13),
         dialogue =    love.graphics.newFont(fontDirectory.."Regular.ttf", 21),
         medium =      love.graphics.newFont(fontDirectory.."Regular.ttf", 17),
         big =         love.graphics.newFont(fontDirectory.."Medium.ttf", 23),
@@ -1274,7 +1275,7 @@ function love.draw()
             DrawTextWithBackground("Hit [ESC] to return to the main menu.", love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + 300, Fonts.medium, {1,1,1}, {0,0,0})
         elseif GameState == "changelog" then
             love.graphics.setColor(1,1,1)
-            love.graphics.setFont(Fonts.medium)
+            love.graphics.setFont(Fonts.changelog)
             love.graphics.print(Changelog, 10, 10)
         end
     end
