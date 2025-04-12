@@ -728,7 +728,7 @@ function love.load()
                 text = "Intel said they're getting strange signals from each of these levels... I should explore to find out what they are.",
                 when = function ()
                     local condition = Level >= 15 and Player.y <= Boundary.y + Boundary.height / 2
-                    if condition then SpawnShrines() end
+                    if condition and #Shrines == 0 then SpawnShrines() end
                     return condition
                 end
             },
@@ -1037,10 +1037,17 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.6"
+    Version = "1.6.1"
     Changelog = Version ..
 [[
  Changelog:
+
+    Bug fixes:
+    - Fixed: Mass of turrets spawning on level 50
+
+
+
+1.6 Changelog:
 
     UI:
     - UI changes
