@@ -243,28 +243,28 @@ function DisplayBlackjackHand(person)
     end
 end
 function InitialiseBlackjackButtons()
-    local spacing, width, height = 20, 200, 40
-    NewButton("Hit", love.graphics.getWidth() / 2 - spacing / 2 - width, love.graphics.getHeight() - spacing - height, width, height, {1,0,0}, {0,0,0}, {.2,0,0}, {1,0,0}, Fonts.normal, 0, 10,10, function (self)
+    local spacing, width, height = 30, 200, 40
+    NewButton("Hit", love.graphics.getWidth() / 2 - spacing / 2 - width, love.graphics.getHeight() - spacing - height, width, height, "center", {1,0,0}, {0,0,0}, {.2,0,0}, {1,0,0}, Fonts.normal, 0, 10,10, function (self)
         local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
         bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "hit")
     end, nil, function (self)
-        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].phase == "player" and Blackjack.playerPlaying and BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].wait.current <= 0
+        return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].phase == "player" and Blackjack.playerPlaying and BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].wait.current <= 0
     end)
-    NewButton("Stay", love.graphics.getWidth() / 2 + spacing / 2, love.graphics.getHeight() - spacing - height, width, height, {0,1,1}, {0,0,0}, {0,.2,.2}, {0,1,1}, Fonts.normal, 0, 10,10, function (self)
+    NewButton("Stay", love.graphics.getWidth() / 2 + spacing / 2, love.graphics.getHeight() - spacing - height, width, height, "center", {0,1,1}, {0,0,0}, {0,.2,.2}, {0,1,1}, Fonts.normal, 0, 10,10, function (self)
         local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
         bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "stay")
     end, nil, function (self)
-        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].phase == "player" and Blackjack.playerPlaying and BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].wait.current <= 0
+        return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].phase == "player" and Blackjack.playerPlaying and BubGlobalData.types[Bubs[Player.bubEngagementIndex].type].wait.current <= 0
     end)
 
-    NewButton("Hell yeah.", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, {0,1,0}, {0,0,0}, {0,.2,0}, {0,1,0}, Fonts.normal, 2, 10,10, function (self)
+    NewButton("Hell yeah.", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, "center", {0,1,0}, {0,0,0}, {0,.2,0}, {0,1,0}, Fonts.normal, 2, 10,10, function (self)
         local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
         bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "play")
     end, nil, function (self)
-        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and (not Blackjack.playerPlaying or Bubs[Player.bubEngagementIndex].phase == "request")
+        return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and (not Blackjack.playerPlaying or Bubs[Player.bubEngagementIndex].phase == "request")
     end)
 
-    NewButton("Okay", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1}, Fonts.normal, 2, 10,10, function (self)
+    NewButton("Okay", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, "center", {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1}, Fonts.normal, 2, 10,10, function (self)
         local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
         bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "acknowledged")
     end, function (self)
@@ -276,6 +276,6 @@ function InitialiseBlackjackButtons()
             self.text = "Huh!"
         end
     end, function (self)
-        return not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and Bubs[Player.bubEngagementIndex].phase == "play again"
+        return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and Bubs[Player.bubEngagementIndex].phase == "play again"
     end)
 end

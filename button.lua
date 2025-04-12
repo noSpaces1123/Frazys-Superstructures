@@ -1,22 +1,38 @@
-function NewButton(text, x, y, width, height, lineColor, fillColor, mouseOverFillColor, textColor, font, lineWidth, roundX, roundY, func, passive, enable)
+function NewButton(text, x, y, width, height, alignMode, lineColor, fillColor, mouseOverFillColor, textColor, font, lineWidth, roundX, roundY, func, passive, enable)
     table.insert(Buttons, {
         x = x, y = y, width = width, height = height, text = text,
         lineColor = lineColor, fillColor = fillColor, mouseOverFillColor = mouseOverFillColor, textColor = textColor, font = font,
         func = func, mouseOver = false, enable = enable, passive = passive,
+        sizeEasing = 0,
         draw = function (self)
             if self.enable(self) then
 
+                local applyFunc = (self.mouseOver and EaseOutQuint or EaseInQuint)
+
+                local amplitude = 20
+                local buttonX = self.x - applyFunc(self.sizeEasing) * amplitude
+                local buttonWidth = self.width + 2 * applyFunc(self.sizeEasing) * amplitude
+
                 love.graphics.setColor((self.mouseOver and self.mouseOverFillColor or self.fillColor))
-                love.graphics.rectangle("fill", self.x, self.y, self.width, self.height, roundX, roundY)
+                love.graphics.rectangle("fill", buttonX, self.y, buttonWidth, self.height, roundX, roundY)
 
                 love.graphics.setColor(self.lineColor)
                 love.graphics.setLineWidth(lineWidth)
-                love.graphics.rectangle("line", self.x, self.y, self.width, self.height, roundX, roundY)
+                love.graphics.rectangle("line", buttonX, self.y, buttonWidth, self.height, roundX, roundY)
 
                 local obj = love.graphics.newText(self.font, self.text)
                 love.graphics.setColor(self.textColor)
                 love.graphics.setFont(self.font)
-                love.graphics.draw(obj, self.x + self.width / 2 - obj:getWidth() / 2, self.y + self.height / 2 - obj:getHeight() / 2)
+
+                local xpos = buttonX + buttonWidth / 2 - obj:getWidth() / 2
+                local spacing = 20
+                if alignMode == "left" then
+                    xpos = buttonX + spacing
+                elseif alignMode == "right" then
+                    xpos = buttonX + buttonWidth - obj:getWidth() - spacing
+                end
+
+                love.graphics.draw(obj, xpos, self.y + self.height / 2 - obj:getHeight() / 2)
 
             end
         end,
@@ -26,8 +42,23 @@ function NewButton(text, x, y, width, height, lineColor, fillColor, mouseOverFil
 
             if self.enable(self) then
 
-                if not before and self.mouseOver and not self.grayedOut then
-                    PlaySFX(SFX.hover, 0.6, 1)
+                if not self.grayedOut then
+                    if not before and self.mouseOver then
+                        PlaySFX(SFX.hover, 0.6, 1)
+
+                        self.sizeEasing = EaseInQuint(self.sizeEasing)
+                    elseif before and not self.mouseOver then
+                        self.sizeEasing = EaseOutQuint(self.sizeEasing)
+                    end
+
+                    local speed = 1/60
+                    if self.mouseOver and self.sizeEasing < 1 then
+                        self.sizeEasing = self.sizeEasing + speed * GlobalDT
+                        if self.sizeEasing > 1 then self.sizeEasing = 1 end
+                    elseif not self.mouseOver and self.sizeEasing > 0 then
+                        self.sizeEasing = self.sizeEasing - speed * GlobalDT
+                        if self.sizeEasing < 0 then self.sizeEasing = 0 end
+                    end
                 end
 
                 if self.passive ~= nil then self.passive(self) end

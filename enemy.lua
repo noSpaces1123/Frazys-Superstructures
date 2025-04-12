@@ -36,9 +36,12 @@ function SpawnEnemies()
 end
 
 function NewEnemy(x, y)
+    local m = (Weather.currentType == "foggy" and Weather.types.foggy.enemySizeMultiplier or 1)
+    local sm = (Weather.currentType == "foggy" and Weather.types.foggy.enemySpeedMultiplier or 1)
+
     table.insert(Enemies, {
         x = x, y = y, xvelocity = 0, yvelocity = 0,
-        width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max), speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide,
+        width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max) * m, speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide * sm,
         viewRadius = math.random(EnemyGlobalData.viewRadius.min, EnemyGlobalData.viewRadius.max), seesPlayer = false,
         warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) },
     })
@@ -49,12 +52,29 @@ function DrawEnemies()
         if not enemy.dead and enemy.discovered and ((not Minimap.showing and Distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) then
             if not enemy.shortCircuit then enemy.shortCircuit = { current = 0, max = 0, running = false } end
 
-            love.graphics.setColor(1,0,0)
+            local fillColor = { 1, (1 - enemy.speed / (EnemyGlobalData.speed.max / EnemyGlobalData.speed.divide)) * .3 ,0 }
+            local eyeColor = { 0,0,0 }
+
+            if Weather.currentType == "foggy" then
+                fillColor = { .05, .05, .05 }
+
+                local v = math.random() / 3 + .2
+                eyeColor = { v, v, v }
+            end
+
+            love.graphics.setColor(fillColor)
             love.graphics.rectangle("fill", enemy.x, enemy.y, enemy.width, enemy.width)
 
+            local r,g,b = love.graphics.getColor()
+            love.graphics.setColor(r,g,b,.3)
+
+            local boxSpacing = 2 + Jitter(3)
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", enemy.x - boxSpacing, enemy.y - boxSpacing, enemy.width + boxSpacing * 2, enemy.width + boxSpacing * 2)
+
             if enemy.seesPlayer and not Player.respawnWait.dead then
-                love.graphics.setColor(1,0,0,math.random()/2)
-                love.graphics.setLineWidth(3)
+                love.graphics.setColor(1,0,0,math.random()/2 + .3)
+                love.graphics.setLineWidth((Weather.currentType == "foggy" and 6 or 3))
                 love.graphics.line(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY)
             end
 
@@ -64,11 +84,16 @@ function DrawEnemies()
             local eyeX, eyeY = enemy.x + enemy.width / 2 + math.sin(angle) * multiply, enemy.y + enemy.width / 2 + math.cos(angle) * multiply
             local eyeWidth = enemy.width * 0.5
 
+            if Weather.currentType == "foggy" then
+                eyeX = eyeX + Jitter(3)
+                eyeY = eyeY + Jitter(3)
+            end
+
             if not enemy.seesPlayer then
                 eyeX, eyeY = enemy.x + enemy.width / 2, enemy.y + enemy.width / 2
             end
 
-            love.graphics.setColor(0,0,0)
+            love.graphics.setColor(eyeColor)
 
             if enemy.shortCircuit.running then
                 eyeWidth = eyeWidth / 4
@@ -96,7 +121,7 @@ function UpdateEnemies()
             enemy.seesPlayer = distance <= enemy.viewRadius
             if enemy.seesPlayer and not before then
                 local ratio = 1 - (enemy.width - EnemyGlobalData.width.min) / (EnemyGlobalData.width.max - EnemyGlobalData.width.min)
-                PlaySFX(SFX.enemySeesPlayer, 0.6, ratio * 1 + 1)
+                PlaySFX(SFX.enemySeesPlayer, 0.6, Clamp(ratio * 1 + 1, 0.1, math.huge))
                 if math.random() < 0.2 then
                     enemy.warble.current = enemy.warble.max
                 end
@@ -125,7 +150,7 @@ function UpdateEnemies()
 
                 if not Player.respawnWait.dead and not NextLevelAnimation.running then
                     if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
-                        if Player.netSpeed + Player.enemyKillForgiveness >= Pythag(enemy.xvelocity, enemy.yvelocity) then
+                        if Player.netSpeed / (Weather.currentType == "foggy" and 4 or 1) + Player.enemyKillForgiveness >= Pythag(enemy.xvelocity, enemy.yvelocity) then
                             ExplodeEnemy(enemy)
                             PlayDialogue(math.random(#Dialogue.eventual.killEnemy), "killEnemy")
                             PlayerSkill.enemiesKilled = PlayerSkill.enemiesKilled + 1
@@ -149,7 +174,7 @@ function UpdateEnemies()
                 if enemy.warble.current >= enemy.warble.max then
                     enemy.warble.current = 0
                     enemy.warble.max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max)
-                    PlaySFX(lume.randomchoice(SFX.enemySpeak), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
+                    PlaySFX(lume.randomchoice(SFX.enemySpeak), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, Clamp(math.random() / 5 + 0.4 - (Weather.currentType == "foggy" and 0.27 or 0), 0.1, math.huge))
                     NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 100, Fonts.medium, index)
                 end
             end
@@ -253,6 +278,19 @@ function DoEnemyCollisions(enemyIndex)
                 DetectIfEnemyDiesToSpeed(Enemies[enemyIndex])
                 swapXVel()
                 Enemies[enemyIndex].x = obj.x + obj.width
+            end
+
+            if closestSide ~= nil and not obj.impenetrable and Weather.currentType == "foggy" and Enemies[enemyIndex].seesPlayer and lume.randomchoice({true,false}) then
+                local maxHearingDistance = ToPixels(6)
+                local distance = Distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
+                local ratio = Clamp(1 - distance / maxHearingDistance, 0, 1)
+
+                SmashObject(obj)
+                PlaySFX(lume.randomchoice(SFX.foggyEnemySmash), .6 * ratio, math.random() / 5 + .9)
+                ShakeIntensity = 40 * ratio
+                Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity = 0, 0
+
+                StartSlowMo(false, false, false)
             end
 
             obj.enemyTouchingSide = closestSide

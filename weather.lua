@@ -3,7 +3,7 @@ function InitialiseWeather()
         currentType = "clear",
         strength = 0, -- real number from 0 to 1
         windEvents = {
-            strength = 1, maxStrength = 0.3,
+            strength = 1, maxStrength = 0.15,
             duration = 0, maxDuration = 2000,
             current = 0, max = 3000,
         },
@@ -93,11 +93,64 @@ vec4 effect(vec4 color, Image image, vec2 texture_coords, vec2 screen_coords) {
                     if self.shaderSinOffset >= 360 then
                         self.shaderSinOffset = self.shaderSinOffset - 360
                     end
+
+                    if not SFX.windy:isPlaying() then
+                        SFX.windy:setLooping(true)
+                        PlaySFX(SFX.windy, 0.6, 1)
+                    end
                 end,
                 start = function (self)
                     for _, obj in ipairs(Objects) do
                         if obj.type == "icy" then
                             obj.type = lume.randomchoice({"death", "normal"})
+                        end
+                    end
+                end,
+            },
+            foggy = {
+                airFrictionAdd = function () return 0.1 * Weather.strength end,
+                jumpPadStrengthAdd = function () return 0 end,
+                passiveCoolingAdd = function () return 0.4 * Weather.strength end,
+                overlay = {.2,.2,.2,.2}, secondOverlay = {0,0,0,.5},
+                shaderSinOffset = 0,
+                enemySizeMultiplier = 4, enemySpeedMultiplier = .5,
+                shader = love.graphics.newShader([[
+
+extern vec2 screenCenter;
+extern float maxLightDistance;
+
+vec4 effect(vec4 color, Image image, vec2 texture_coords, vec2 screen_coords) {
+
+    float distance = sqrt( pow(screenCenter.x - screen_coords.x, 2) + pow(screenCenter.y - screen_coords.y, 2) );
+
+    float v = 1 - distance / maxLightDistance;
+    vec4 fog = vec4( v, v, v, 1 );
+
+    vec4 pixel = Texel(image, texture_coords);
+
+    return pixel * color * fog;
+}
+
+                ]]),
+                update = function (self)
+                    self.shaderSinOffset = self.shaderSinOffset + 0.001 * GlobalDT
+                    if self.shaderSinOffset >= 360 then
+                        self.shaderSinOffset = self.shaderSinOffset - 360
+                    end
+
+                    if not SFX.windy:isPlaying() then
+                        SFX.windy:setLooping(true)
+                        PlaySFX(SFX.windy, 0.6, 1)
+                    end
+
+                    if Music:isPlaying() then
+                        Music:pause()
+                    end
+                end,
+                start = function (self)
+                    for _, obj in ipairs(Objects) do
+                        if obj.type ~= "normal" and obj.type ~= "jump" and not obj.impenetrable then
+                            obj.type = "normal"
                         end
                     end
                 end,
@@ -123,6 +176,7 @@ function DrawWeatherOverlay()
         love.graphics.setColor(color[1], color[2], color[3], Weather.strength * color[4])
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
+        love.graphics.setLineWidth(1)
         for _ = 1, Weather.strength * 300 do
             love.graphics.setColor(1,1,1, math.random()*0.4)
 
@@ -141,6 +195,10 @@ function DrawWeatherOverlay()
         end
 
         love.graphics.setBlendMode("alpha")
+    elseif Weather.currentType == "foggy" then
+        local color = Weather.types[Weather.currentType].secondOverlay
+        love.graphics.setColor(color[1], color[2], color[3], Weather.strength * color[4])
+        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
     end
 end
 

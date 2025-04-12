@@ -14,7 +14,7 @@ function LoadPlayer()
         smashSpeedThreshold = 50,
         respawnWait = { current = 0, max = 200, dead = false },
         temperature = { current = 0, max = 500 }, passiveCooling = .4,
-        superJump = { increase = 1, current = 0, max = 1500, cost = 900, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
+        superJump = { increase = 1, current = 0, max = 1500, cost = 900, replenished = false, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
         checkpoint = { x = nil, y = nil },
         timeStill = 0, timeStillFocusDivisor = 200,
         renderDistance = ToPixels(10),
@@ -42,6 +42,8 @@ function RespawnPlayer()
 
     MessageWithPlayerStats()
     ApplyShrineEffects()
+
+    PlaySFX(SFX.playerSpawn, 0.5, 1)
 end
 function ResetPlayerData()
     PlayerSkill = {
@@ -65,6 +67,8 @@ function ResetPlayerData()
     for _, value in ipairs(Upgrades[3].list) do
         AnalyticsUpgrades[value] = false
     end
+
+    Plinks = 0
 end
 function ResetGame()
     Level = 1
@@ -93,7 +97,7 @@ function UpdatePlayer()
         UpdatePlayerCoyote()
         DoPlayerSpeedParticles()
         DoObjectEffects()
-        DoPlayerMovement(true)
+        DoPlayerMovement()
         UpdateBlips()
         DoPlayerFriction()
         CheckIfPlayerHasCompletedLevel()
@@ -187,6 +191,7 @@ function UpdateKeyBuffer()
                 StartSlowMo(true, true, false)
             end
         elseif CommandLine.verified and key == "r" and Paused and GameState == "game" then
+            Seed = os.time()
             GenerateObjects()
             LoadPlayer()
             SaveData()
@@ -337,16 +342,18 @@ function DoPlayerKeyPresses()
         if love.keyboard.isDown("d") then
             Minimap.x = Minimap.x + Minimap.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
         end
-    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running and not Player.touchingStickyObject and PlayerCanMove then
-        Player.pressing.a = love.keyboard.isDown("a") or love.keyboard.isDown("left")
-        Player.pressing.d = love.keyboard.isDown("d") or love.keyboard.isDown("right")
+    elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running then
+        if not Player.touchingStickyObject and PlayerCanMove then
+            Player.pressing.a = love.keyboard.isDown("a") or love.keyboard.isDown("left")
+            Player.pressing.d = love.keyboard.isDown("d") or love.keyboard.isDown("right")
 
-        -- keypresses
-        if Player.pressing.a then
-            Player.xvelocity = Player.xvelocity - Player.speed * GlobalDT
-        end
-        if Player.pressing.d then
-            Player.xvelocity = Player.xvelocity + Player.speed * GlobalDT
+            -- keypresses
+            if Player.pressing.a then
+                Player.xvelocity = Player.xvelocity - Player.speed * GlobalDT
+            end
+            if Player.pressing.d then
+                Player.xvelocity = Player.xvelocity + Player.speed * GlobalDT
+            end
         end
 
         if love.keyboard.isDown("b") then
@@ -371,11 +378,11 @@ function DoPlayerKeyPresses()
     end
 end
 
-function DoPlayerMovement(particlesOn)
+function DoPlayerMovement()
     local checks = 10
     for _ = 0, 1, 1 / checks do
         ApplyPlayerVelocities(checks)
-        DoPlayerCollisions(particlesOn)
+        DoPlayerCollisions()
     end
 end
 
@@ -423,7 +430,7 @@ function ApplyPlayerVelocities(checks)
     Player.y = Player.y + Player.yvelocity * GlobalDT / checks
 end
 
-function DoPlayerCollisions(particlesOn)
+function DoPlayerCollisions()
     local wasStandingOnObject = Player.standingOnObject
     local wasTouchingStickyObject = Player.touchingStickyObject
 
@@ -560,10 +567,10 @@ function ConvertXIntoYVelocity()
     Player.xvelocity = 0
 end
 
-function ConvertPlayerVelocityToZoom()
+function CalculateZoom()
     local minVelocity = 15
     local zoom = 1 - Clamp(math.abs(Player.xvelocity) / 200 - minVelocity / 300, 0, math.huge) / 2
-    return Clamp(zoom, .4, 1) - Player.zoom
+    return Clamp(zoom, .4, 1) - Player.zoom + (Weather.currentType == "foggy" and .2 or 0)
 end
 
 function DoPlayerSpeedParticles()
@@ -660,24 +667,8 @@ function CheckAndIfSoDoPlayerSmash(objIndex)
 
     ShakeIntensity = 30
 
-    for _ = 1, math.abs(Player.xvelocity) * 2 do
-        local degrees = math.random(360)
-        local radius = math.random() * 10 + 2
-        local speed = math.random() * 10 + 4
-        local decay = math.random(160, 300)
-        table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,1,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
-        function (self)
-            if self.speed > 0 then
-                self.speed = self.speed - 0.02 * GlobalDT
-                if self.speed <= 0 then
-                    self.speed = 0
-                end
-            end
-        end))
-    end
-
     if not Objects[objIndex].impenetrable then
-        table.remove(Objects, objIndex)
+        SmashObject(Objects[objIndex])
         PlaySFX(SFX.smash, .7, math.random() / 10 + .95)
     else
         PlaySFX(SFX.clang, .6, math.random() / 10 + .95)
@@ -687,6 +678,10 @@ end
 function ConvertPlayerVelocityToCameraLookAhead()
     local xtowards, ytowards = (Player.xvelocity > 0 and -1 or 1), (Player.yvelocity > 0 and -1 or 1)
     return Clamp((math.abs(Player.xvelocity) - 5) / 3, 0, math.huge) * xtowards, Clamp((math.abs(Player.yvelocity) - 5) / 3, 0, math.huge) * ytowards
+end
+function ConvertPlayerVelocityToCameraRotation()
+    if not Settings.cameraRotationOn then return 0 end
+    return math.rad(Player.xvelocity / 20)
 end
 
 function UpdateBlips()
@@ -736,6 +731,7 @@ function KillPlayer()
 
     for _ = 1, 100 do
         local degrees = math.random(360)
+
         local radius = math.random() * 10 + 2
         local speed = math.random() * 10 + 7
         local decay = math.random(160, 300)
@@ -790,6 +786,17 @@ function UpdatePlayerSuperJumpBar()
     else
         if Player.superJump.increase == nil then Player.superJump.increase = 1 end
         Player.superJump.current = Player.superJump.current + Player.superJump.increase * GlobalDT
+
+        if not Player.superJump.replenished and Player.superJump.current >= Player.superJump.cost then
+            Player.superJump.replenished = true
+            PlaySFX(SFX.superJumpReplenish, .4, 1)
+        elseif Player.superJump.current < Player.superJump.cost then
+            Player.superJump.replenished = false
+        end
+
+        if Player.superJump.current >= Player.superJump.max then
+            PlaySFX(SFX.superJumpFull, .4, 1)
+        end
     end
 end
 function DrawPlayerSuperJumpBar()
@@ -817,6 +824,7 @@ function DoPlayerSuperJump()
         Player.touchingStickyObject = false
         Player.yvelocity = Player.yvelocity + Player.superJumpStrength * (Descending.doingSo and 1 or -1)
         Player.superJump.current = Player.superJump.current - Player.superJump.cost
+        PlaySFX(SFX.superJump, .7, 1)
     end
 end
 function CanSuperJump()
@@ -880,11 +888,7 @@ function CheckCollisionWithCheckpoints()
                 if not sfxIsPlaying then
                     PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
 
-                    local dialogueIndex = 57
-                    if not Dialogue.list[dialogueIndex].done then
-                        PlayDialogue(dialogueIndex)
-                        Dialogue.list[dialogueIndex].done = true
-                    end
+                    TriggerDialogue(57)
 
                     for _ = 1, 20 do
                         local degrees = math.random(360)
@@ -1210,6 +1214,13 @@ function DrawDialogue()
     if not Dialogue.playing.running then return end
     DrawTextWithBackground(Dialogue.playing.text, Player.centerX, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
 end
+function TriggerDialogue(index)
+    if index > #Dialogue.list then error("looks like you're tryna trigger dialogue that doesn't exist fool") end
+    if Dialogue.list[index].done then return end
+
+    Dialogue.list[index].done = true
+    PlayDialogue(index)
+end
 
 function UpdateEffectsOfPlayerSelfDestruct()
     Player.zoom = Player.baseZoom + 0.2 * EaseInExpo(Player.selfDestruct.current / Player.selfDestruct.max)
@@ -1225,4 +1236,10 @@ function DrawPlayerSelfDestructOverlay()
     love.graphics.setColor(1,0,0, Player.selfDestruct.current / Player.selfDestruct.max / 2)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
     love.graphics.setBlendMode("alpha")
+end
+
+function GainPlinks(amount)
+    Plinks = Plinks + 1
+    NewMessage("+" .. amount .. " plink", 0, -50, Player.color, 130, Fonts.medium, nil, true)
+    NewMessage(Plinks .. " plinks total", 0, 50, Player.color, 130, Fonts.normal, nil, true)
 end

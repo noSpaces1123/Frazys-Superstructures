@@ -50,12 +50,16 @@ function love.load()
         drawCard = love.audio.newSource("assets/sfx/draw card.wav", "static"),
         bust = love.audio.newSource("assets/sfx/bust.wav", "static"),
         blackjackSpotOn = love.audio.newSource("assets/sfx/blackjack spot-on.wav", "static"),
-        rain = love.audio.newSource("assets/sfx/rain.mp3", "static"),
+        rain = love.audio.newSource("assets/sfx/rain.mp3", "stream"),
         selfDestruct = love.audio.newSource("assets/sfx/self destruct.wav", "static"),
         push = love.audio.newSource("assets/sfx/push.wav", "static"),
         wind = love.audio.newSource("assets/sfx/wind.wav", "static"),
         windWarning = love.audio.newSource("assets/sfx/wind warning.wav", "static"),
         windOver = love.audio.newSource("assets/sfx/wind over.wav", "static"),
+        windy = love.audio.newSource("assets/sfx/windy.mp3", "stream"),
+        superJump = love.audio.newSource("assets/sfx/super jump.wav", "static"),
+        superJumpReplenish = love.audio.newSource("assets/sfx/super jump replenish.wav", "static"),
+        superJumpFull = love.audio.newSource("assets/sfx/super jump full.wav", "static"),
         checkpointFizzleOut = {
             love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
             love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
@@ -70,8 +74,22 @@ function love.load()
             love.audio.newSource("assets/sfx/short circuit2.wav", "static"),
             love.audio.newSource("assets/sfx/short circuit3.wav", "static"),
         },
+        foggyEnemySmash = {
+            love.audio.newSource("assets/sfx/foggy enemy smash.wav", "static"),
+            love.audio.newSource("assets/sfx/foggy enemy smash2.wav", "static"),
+            love.audio.newSource("assets/sfx/foggy enemy smash3.wav", "static"),
+        },
         enemySpeak = {},
     }
+
+    love.audio.setEffect("reverb", { type = "reverb", decaytime = 2 })
+    SFX.superJumpFull:setEffect("reverb")
+    SFX.superJumpReplenish:setEffect("reverb")
+    SFX.superJump:setEffect("reverb")
+
+    for _, sfx in ipairs(SFX.foggyEnemySmash) do
+        sfx:setEffect("reverb")
+    end
 
     for i = 1, 13 do
         table.insert(SFX.enemySpeak, love.audio.newSource("assets/sfx/enemy speak" .. i .. ".wav", "static"))
@@ -113,6 +131,7 @@ function love.load()
     Settings = {
         musicOn = true,
         graphics = { current = 3, max = 3 },
+        cameraRotationOn = true,
     }
 
     Characters = "abcdefghijklmnopqrstuvwxyz"
@@ -259,7 +278,7 @@ function love.load()
         noticeDistance = ToPixels(4),
         dialogueSpacingFromBub = 60,
         edgeRounding = 2,
-        maxHintDistance = ToPixels(75),
+        maxHintDistance = ToPixels(30),
         types = {
             ["Jack"] = {
                 width = 20, height = 20, color = { 176/255, 127/255, 63/255 },
@@ -415,7 +434,7 @@ function love.load()
 
     InitialiseWeather()
 
-    WeatherPalette = { clear = 3, rainy = 3, hot = 3 }
+    WeatherPalette = { clear = 3, rainy = 3, hot = 2, foggy = 1 }
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2, push = 6 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
@@ -910,6 +929,12 @@ function love.load()
                     return false
                 end
             },
+            {
+                text = "Intel says that every 10 plinks, I'm able to get an upgrade as a reward for the data I collect!",
+                when = function ()
+                    return false
+                end
+            },
         },
         eventual = {
             killEnemy = {
@@ -944,6 +969,8 @@ function love.load()
 
     InitialiseUpgrades()
 
+    Plinks = 0
+
     if love.filesystem.getInfo("data.csv") then
         LoadData()
     else
@@ -951,9 +978,7 @@ function love.load()
         ResetPlayerData()
     end
 
-    if Settings.musicOn then Music:play() end
-
-    --NewBub(Player.x, Player.y-10, "Jack")
+    if Settings.musicOn and not Weather.currentType == "foggy" then Music:play() end
 
     MessageWithPlayerStats()
 
@@ -1011,16 +1036,45 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.5"
+    Version = "1.6"
     Changelog = Version ..
 [[
  Changelog:
 
+    UI:
+    - UI changes
+
+    Camera:
+    - New: Camera rotation based on velocity (togglable in settings)
+
+    Platforms:
+    - New: Added random color darkening for variation
+
     Turrets:
-    - New: Push turrets
+    - Removed: Bouncing off turrets when destroying them
+    - New: Screen shake when destroying turrets
 
     Weather:
-    - New: Added wind events to rainy levels
+    - New: Wind whooshing sound for hot levels
+    - New: Foggy weather
+    - Change: Hot weather chance when starting a new level decreased from 33% to 25%
+    - Change: Decreased wind event strength
+    - Fixed: Rainy level rain effect being at random line widths
+    - Fixed: Rainy level rain sounds looping awkwardly
+    - Fixed: Added continuity with wind events across game instances
+
+    Bubs:
+    - Change: Decreased Bub detection radius from 75 to 30 meters
+
+    Super jump:
+    - New: Added SFX to communicate when a super jump can be used and when your bar is at max
+
+    Bug fixes:
+    - Fixed: Hit and stay buttons for blackjack appearing in the main menu
+    - Fixed: Hooligans moving around and attacking the player when in the main menu
+
+    OTHER:
+    - Change: Changed game icon to resemble a hooligan
 ]]
 
     Debug = false
@@ -1084,7 +1138,6 @@ function love.update(dt)
 
                 UpdateSaveInterval()
             else
-                UpdateMovables()
                 Title:update(Title)
             end
         end
@@ -1104,6 +1157,10 @@ function love.update(dt)
     end
 
     Player.centerX, Player.centerY = Player.x + Player.width / 2, Player.y + Player.height / 2
+
+    if TimeMultiplier > 1 then
+        TimeMultiplier = 1
+    end
 end
 
 function love.draw()
@@ -1124,8 +1181,17 @@ function love.draw()
             if Weather.types[Weather.currentType].shader ~= nil then
                 love.graphics.setShader(Weather.types[Weather.currentType].shader)
 
-                Weather.types[Weather.currentType].shader:send("screenDimensions", {love.graphics.getWidth(), love.graphics.getHeight()})
-                Weather.types[Weather.currentType].shader:send("sinOffset", Weather.types[Weather.currentType].shaderSinOffset)
+                if Weather.currentType == "hot" then
+                    Weather.types[Weather.currentType].shader:send("screenDimensions", {love.graphics.getWidth(), love.graphics.getHeight()})
+                    Weather.types[Weather.currentType].shader:send("sinOffset", Weather.types[Weather.currentType].shaderSinOffset)
+                elseif Weather.currentType == "foggy" then
+                    --Weather.types[Weather.currentType].shader:send("screenDimensions", {love.graphics.getWidth(), love.graphics.getHeight()})
+                    Weather.types[Weather.currentType].shader:send("screenCenter", {
+                        love.graphics.getWidth(),
+                        love.graphics.getHeight(),
+                    })
+                    Weather.types[Weather.currentType].shader:send("maxLightDistance", 1300)
+                end
             end
 
             GlobalCanvas:renderTo(DrawGameFrame)
@@ -1197,6 +1263,12 @@ function love.draw()
             end
 
             Title.draw(Title)
+
+            if Level > 1 then
+                love.graphics.setColor(Player.color)
+                love.graphics.setFont(Fonts.medium)
+                love.graphics.print(Plinks .. " plinks", 20, 20)
+            end
         elseif GameState == "complete" then
             DrawTextWithBackground("Intel got what they needed. Nice job!\n" .. TimeInSecondsToStupidFuckingHumanFormat(TotalTime), love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, Fonts.big, Player.color, {0,0,0})
             DrawTextWithBackground("Hit [ESC] to return to the main menu.", love.graphics.getWidth() / 2, love.graphics.getHeight() / 2 + 300, Fonts.medium, {1,1,1}, {0,0,0})
@@ -1327,6 +1399,12 @@ function DrawObjects()
         else
             love.graphics.setColor(1,1,1, 1)
         end
+
+        if obj.darkGrading then
+            local r,g,b = love.graphics.getColor()
+            love.graphics.setColor(r - obj.darkGrading, g - obj.darkGrading, b - obj.darkGrading, 1)
+        end
+
         love.graphics.rectangle("fill", obj.x, obj.y, obj.width, obj.height, ObjectGlobalData.cornerRadius, ObjectGlobalData.cornerRadius)
 
         if obj.dangerPulse then
@@ -1350,6 +1428,7 @@ function DrawObjects()
         ::continue::
     end
 
+    -- posters
     for _, obj in ipairs(Objects) do
         local outsideRenderDistance = not obj.render
         if not obj.discovered and GameState == "game" then goto continue end
@@ -1371,8 +1450,8 @@ end
 function GenerateObjects()
     DeathPositions = {}
 
-    local boundaryObjWidth = 1500
-    local playerSafeArea = 600
+    local boundaryObjWidth = ToPixels(7)
+    local playerSafeArea = ToPixels(5)
     Objects = {
         {
             x = Boundary.x, y = Boundary.y + Boundary.height,
@@ -1394,8 +1473,7 @@ function GenerateObjects()
     Shrines = {}
     Bullets = {}
 
-    math.randomseed(Seed)
-    for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
+    local newObj = function ()
         local x, y = math.random(Boundary.x - boundaryObjWidth, Boundary.x + Boundary.width), math.random(Boundary.y, Boundary.y + Boundary.height)
 
         local objectType = GetObjectTypeFromPerlinNoise(x, y)
@@ -1407,10 +1485,18 @@ function GenerateObjects()
             height = movingWidth
         end
 
-        table.insert(Objects, {
+        return {
             x = x, y = y,
-            width = width, height = height, type = objectType
-        })
+            width = width, height = height, type = objectType,
+            darkGrading = math.random() / 10,
+        }
+    end
+
+    math.randomseed(Seed)
+
+    -- objs
+    for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
+        table.insert(Objects, newObj())
     end
 
     -- posters
@@ -1435,7 +1521,10 @@ function GenerateObjects()
 
     GetThreadData()
 
-    SpawnTurrets(playerSafeArea)
+    if Weather.currentType ~= "foggy" then
+        SpawnTurrets(playerSafeArea)
+    end
+
     SpawnCheckpoints()
     if Dialogue.list[25].done or true then SpawnShrines() end
     SpawnEnemies()
@@ -1459,6 +1548,25 @@ function GetObjectTypeFromPerlinNoise(x, y)
             return value.type
         end
     end
+end
+function SmashObject(obj)
+    for _ = 1, 60 do
+        local degrees = math.random(360)
+        local radius = math.random() * 10 + 2
+        local speed = math.random() * 7 + 4
+        local decay = math.random(160, 300)
+        table.insert(Particles, NewParticle(obj.x+obj.width/2, obj.y+obj.height/2, radius, {1,1,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
+        function (self)
+            if self.speed > 0 then
+                self.speed = self.speed - 0.02 * GlobalDT
+                if self.speed <= 0 then
+                    self.speed = 0
+                end
+            end
+        end))
+    end
+
+    lume.remove(Objects, obj)
 end
 function DiscoverAndRenderDiscoverables()
     if NextLevelAnimation.running then return end
@@ -1593,7 +1701,12 @@ function NextLevel()
             PlaySFX(SFX.descended, 0.5, 1)
         end
 
+        if Settings.musicOn and not Music:isPlaying() then
+            Music:play()
+        end
+
         SFX.rain:stop()
+        SFX.windy:stop()
     end
 end
 function CorrectBoundaryHeight()
@@ -1618,7 +1731,9 @@ function UpdateNextLevelAnimation()
         MessageWithPlayerStats()
         SaveData()
 
-        if not OpenUpgradeMenu() then
+        if Level >= UpgradeData.startGettingUpgradesOnLevel and Level % UpgradeData.upgradeInterval == 0 then
+            OpenUpgradeMenu()
+        else
             PlaySFX(SFX.playerSpawn, 0.5, 1)
         end
     end
@@ -1958,6 +2073,9 @@ end
 function EaseOutQuint(x)
     return 1 - (1 - x)^5
 end
+function EaseInQuint(x)
+    return x^5
+end
 function EaseInExpo(x)
     return (x == 0 and 0 or 2^(10 * x - 10))
 end
@@ -2127,71 +2245,6 @@ function ApplyShrineEffects()
     if PlayerPerks["Essence of the Grasshopper"] then Player.jumpStrength = 30; Player.superJumpStrength = 100 end
 end
 
-function FireBullet(x, y, angle, speed, originTurretIndex)
-    local lifespan = 400
-    table.insert(Bullets, {
-        x = x, y = y, radius = TurretGlobalData.bulletRadius, warningProgression = 0,
-        draw = function (self)
-            love.graphics.setColor(1,0,0)
-            love.graphics.circle("fill", self.x, self.y, self.radius)
-
-            local maxdistance, checks = 1300, 20
-            for i = 0, maxdistance, maxdistance / checks do
-                if Distance(Player.centerX, Player.centerY,
-                self.x + math.sin(angle) * i, self.y + math.cos(angle) * i) <= Player.width / 2 + self.radius + maxdistance/checks * 2 then
-                    self.warningProgression = self.warningProgression + .1 * GlobalDT
-                    if self.warningProgression > 1 then
-                        self.warningProgression = 1
-                    end
-                else
-                    self.warningProgression = self.warningProgression - 0.02 * GlobalDT
-                    if self.warningProgression < 0 then
-                        self.warningProgression = 0
-                    end
-                end
-            end
-
-            love.graphics.setLineWidth(3)
-            love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression), 100)
-        end,
-        update = function (self)
-            local distanceToPlayer = Distance(Player.centerX, Player.centerY, self.x, self.y)
-            local multiplier = Lerp(0.3, 1, Clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
-
-            self.x = self.x + math.sin(angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
-            self.y = self.y + math.cos(angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
-
-            lifespan = lifespan - 1 * GlobalDT
-            if lifespan < 0 then
-                lume.remove(Bullets, self)
-            end
-
-            local maxLifeForShrink = 50
-            if lifespan <= maxLifeForShrink then
-                local ratio = lifespan / maxLifeForShrink
-                self.radius = TurretGlobalData.bulletRadius * ratio
-            end
-
-            --[[
-            for index, turret in ipairs(Turrets) do
-                if index ~= originTurretIndex and Distance(turret.x, turret.y, self.x, self.y) <= TurretGlobalData.headRadius + TurretGlobalData.bulletRadius then
-                    ExplodeTurret(turret)
-                end
-            end]]
-        end
-    })
-end
-function UpdateBullets()
-    for _, bullet in ipairs(Bullets) do
-        bullet:update()
-    end
-end
-function DrawBullets()
-    for _, bullet in ipairs(Bullets) do
-        bullet:draw()
-    end
-end
-
 function AngleBetween(x1, y1, x2, y2)
 ---@diagnostic disable-next-line: deprecated
     return math.atan2(x2 - x1, y2 - y1)
@@ -2275,10 +2328,12 @@ function CheckForOddities()
 end
 
 function InitialiseRegularCoordinateAlterations()
-    local zoom = ConvertPlayerVelocityToZoom()
+    local zoom = CalculateZoom()
     local lookAheadX, lookAheadY = ConvertPlayerVelocityToCameraLookAhead()
     love.graphics.scale(zoom)
     love.graphics.translate(love.graphics.getWidth() / zoom / 2 + lookAheadX, love.graphics.getHeight() / zoom / 2 + lookAheadY)
+
+    love.graphics.rotate(ConvertPlayerVelocityToCameraRotation())
 
     if not NextLevelAnimation.running then
         love.graphics.translate(-Player.x - Player.width / 2, -Player.y - Player.height / 2)
@@ -2331,23 +2386,25 @@ function Jitter(amplitude)
 end
 
 function InitialiseMenuButtons()
-    local width = 300
+    local width = love.graphics.getWidth() - 200
     local CENTERX, CENTERY = love.graphics.getWidth() / 2, love.graphics.getHeight() / 2
 
+    local x = 100
+
     -- main menu
-    NewButton("Begin", CENTERX - width / 2, CENTERY + 100, width, 80, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.big, 2, 10,10, function (self)
+    NewButton("Begin", x, CENTERY + 100, width, 80, "left", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.big, 2, 10,10, function (self)
         GameState = "game"
         MenuAnimation.overlay = 1
         LoadData()
     end, nil, function (self)
         return GameState == "menu"
     end)
-    NewButton("Settings", CENTERX - width / 2, CENTERY + 200, width, 60, {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("Settings", x, CENTERY + 200, width, 60, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 0, 10,10, function (self)
         GameState = "settings"
     end, nil, function (self)
         return GameState == "menu"
     end)
-    NewButton("Changelog", CENTERX - width / 2, CENTERY + 270, width, 40, {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("Changelog", x, CENTERY + 270, width, 40, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 0, 10,10, function (self)
         GameState = "changelog"
     end, nil, function (self)
         return GameState == "menu"
@@ -2355,7 +2412,7 @@ function InitialiseMenuButtons()
 
     -- settings
     width = 800
-    NewButton("", CENTERX - width / 2, CENTERY - 200, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("music", CENTERX - width / 2, CENTERY - 200, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         Settings.musicOn = not Settings.musicOn
         SaveData()
 
@@ -2367,7 +2424,7 @@ function InitialiseMenuButtons()
     end, function (self)
         return GameState == "settings"
     end)
-    NewButton("", CENTERX - width / 2, CENTERY - 100, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("graphics", CENTERX - width / 2, CENTERY - 00, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         Settings.graphics.current = Settings.graphics.current + 1
         if Settings.graphics.current > Settings.graphics.max then Settings.graphics.current = 1 end
         if Settings.graphics.current >= 2 then
@@ -2382,15 +2439,25 @@ function InitialiseMenuButtons()
     end, function (self)
         return GameState == "settings"
     end)
+    NewButton("camera rotation", CENTERX - width / 2, CENTERY - 100, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+        Settings.cameraRotationOn = not Settings.cameraRotationOn
+        SaveData()
+    end, function (self)
+        self.text = "Camera rotation: " .. (Settings.cameraRotationOn and "On" or "Off")
+        self.textColor = (Settings.cameraRotationOn and {0,1,0} or {1,0,0})
+        self.lineColor = self.textColor
+    end, function (self)
+        return GameState == "settings"
+    end)
 
-    NewButton("Back", CENTERX - width / 2, CENTERY + 300, width, 60, {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("Back", CENTERX - width / 2, CENTERY + 300, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         GameState = "menu"
     end, nil, function (self)
         return GameState == "settings" or GameState == "changelog"
     end)
 
     width = 500
-    NewButton("Reset Current Run", CENTERX - width / 2, CENTERY + 400, width, 60, {1,0,0}, {0,0,0}, {.1,.1,.1}, {1,0,0}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("Reset Current Run", CENTERX - width / 2, CENTERY + 400, width, 60, "center", {1,0,0}, {0,0,0}, {.1,.1,.1}, {1,0,0}, Fonts.medium, 2, 10,10, function (self)
         if not self.confirmation then
             self.confirmation = 0
             self.text = "Shift-click to confirm."
@@ -2529,7 +2596,7 @@ function InitialiseUpgrades()
 
     local width = 400
     for index = 1, #Upgrades do
-        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2) + 50, width, 40, {0,0,0}, {0,0,0}, {.2,.2,.2}, {1,1,1},
+        NewButton("Commit", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() / 2 + UpgradeData.spacingOnMenu * (index - (#Upgrades+1)/2) + 50, width, 40, "center", {0,0,0}, {0,0,0}, {.2,.2,.2}, {1,1,1},
         Fonts.normal, 0, 10, 10, function (self)
             local listOfCategories = {}
             for _, value in ipairs(Upgrades) do
@@ -2560,7 +2627,7 @@ function InitialiseUpgrades()
         end)
     end
 
-    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 80, width, 40, {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.normal, 2, 10, 10, function (self)
+    NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 80, width, 40, "center", {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.normal, 2, 10, 10, function (self)
         UpgradeData.picked, UpgradeData.picking = false, false
         PlaySFX(SFX.playerSpawn, 0.5, 1)
     end, nil, function ()
@@ -2583,12 +2650,9 @@ function ApplyUpgrades()
     end
 end
 function OpenUpgradeMenu()
-    if Level >= UpgradeData.startGettingUpgradesOnLevel and Level % UpgradeData.upgradeInterval == 0 then
-        UpgradeData.picking = true
-        PlaySFX(SFX.upgradeMenu, 0.7, 1)
-        return true
-    end
-    return false
+    ShakeIntensity = 0
+    UpgradeData.picking = true
+    PlaySFX(SFX.upgradeMenu, 0.7, 1)
 end
 function DrawUpgradeMenuOverlay()
     love.graphics.setColor(0,0,0, 0.5)

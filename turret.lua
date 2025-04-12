@@ -99,6 +99,7 @@ function UpdateTurrets()
                     elseif turret.type == "laser" then
                         PlaySFX(SFX.jump, .1, .6)
                         IncreasePlayerTemperature(2.5)
+                        table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*(Player.temperature.current/Player.temperature.max)*4+2, {1,.5,0,math.random()/2+.5}, 1, math.random(360), 0.02, 300))
                     elseif turret.type == "drag" then
                         turret.fireRate.current = 0
                         PlaySFX(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
@@ -106,7 +107,7 @@ function UpdateTurrets()
                     elseif turret.type == "push" then
                         if not SFX.push:isPlaying() then PlaySFX(SFX.push, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5) end
 
-                        DragPlayerTowards(turret.x, turret.y, -0.7 * GlobalDT)
+                        DragPlayerTowards(turret.x, turret.y, -0.8 * GlobalDT)
 
                         table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*3+2, {1,0,.7,math.random()/2+.5}, 2, math.random(360), 0, 300,
                         function (self)
@@ -171,10 +172,17 @@ function UpdateTurrets()
             if distance <= TurretGlobalData.headRadius + Player.width / 2 then
                 ExplodeTurret(turret)
 
-                Player.xvelocity = -Player.xvelocity
-                Player.yvelocity = -Player.yvelocity
+                ShakeIntensity = 20
+
+                if Player.superJump.current >= Player.superJump.max then
+                    GainPlinks(1)
+                end
+
+                Player.xvelocity, Player.yvelocity = Player.xvelocity * 3, Player.yvelocity * 3
 
                 PlayerSkill.turretsDestroyed = PlayerSkill.turretsDestroyed + 1
+
+                StartSlowMo(false, false, false)
 
                 Player.superJump.current = Player.superJump.current + Player.superJump.reward.explodingTurret
                 SaveData()
@@ -309,4 +317,69 @@ function DrawThreatBox(turret)
     love.graphics.print("threat", x + spacing, y - Fonts.normal:getHeight() - spacing)
 
     love.graphics.pop()
+end
+
+function FireBullet(x, y, angle, speed, originTurretIndex)
+    local lifespan = 400
+    table.insert(Bullets, {
+        x = x, y = y, radius = TurretGlobalData.bulletRadius, warningProgression = 0, angle = angle,
+        draw = function (self)
+            love.graphics.setColor(1,0,0)
+            love.graphics.circle("fill", self.x, self.y, self.radius)
+
+            local maxdistance, checks = 1300, 20
+            for i = 0, maxdistance, maxdistance / checks do
+                if Distance(Player.centerX, Player.centerY,
+                self.x + math.sin(self.angle) * i, self.y + math.cos(self.angle) * i) <= Player.width / 2 + self.radius + maxdistance/checks * 2 then
+                    self.warningProgression = self.warningProgression + .1 * GlobalDT
+                    if self.warningProgression > 1 then
+                        self.warningProgression = 1
+                    end
+                else
+                    self.warningProgression = self.warningProgression - 0.02 * GlobalDT
+                    if self.warningProgression < 0 then
+                        self.warningProgression = 0
+                    end
+                end
+            end
+
+            love.graphics.setLineWidth(3)
+            love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression), 100)
+        end,
+        update = function (self)
+            local distanceToPlayer = Distance(Player.centerX, Player.centerY, self.x, self.y)
+            local multiplier = Lerp(0.3, 1, Clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
+
+            self.x = self.x + math.sin(self.angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
+            self.y = self.y + math.cos(self.angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
+
+            lifespan = lifespan - 1 * GlobalDT
+            if lifespan < 0 then
+                lume.remove(Bullets, self)
+            end
+
+            local maxLifeForShrink = 50
+            if lifespan <= maxLifeForShrink then
+                local ratio = lifespan / maxLifeForShrink
+                self.radius = TurretGlobalData.bulletRadius * ratio
+            end
+
+            --[[
+            for index, turret in ipairs(Turrets) do
+                if index ~= originTurretIndex and Distance(turret.x, turret.y, self.x, self.y) <= TurretGlobalData.headRadius + TurretGlobalData.bulletRadius then
+                    ExplodeTurret(turret)
+                end
+            end]]
+        end
+    })
+end
+function UpdateBullets()
+    for _, bullet in ipairs(Bullets) do
+        bullet:update()
+    end
+end
+function DrawBullets()
+    for _, bullet in ipairs(Bullets) do
+        bullet:draw()
+    end
 end
