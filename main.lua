@@ -8,6 +8,7 @@ function love.load()
     require "turret"
     require "bub"
     require "weather"
+    require "changelog"
 
     NameOfTheGame = "Frazy's Superstructures"
 
@@ -133,6 +134,7 @@ function love.load()
         musicOn = true,
         graphics = { current = 3, max = 3 },
         cameraRotationOn = true,
+        weatherDarkening = true,
     }
 
     Characters = "abcdefghijklmnopqrstuvwxyz"
@@ -435,7 +437,7 @@ function love.load()
 
     InitialiseWeather()
 
-    WeatherPalette = { clear = 3, rainy = 3, hot = 2, foggy = 1 }
+    WeatherPalette = { clear = 8, rainy = 6, hot = 4, foggy = 1 }
     TurretGenerationPalette = { normal = 20, laser = 4, drag = 2, push = 6 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
@@ -1037,54 +1039,6 @@ function love.load()
 
     ClickedWithMouse = false
 
-    Version = "1.6.1"
-    Changelog = Version ..
-[[
- Changelog:
-
-    Bug fixes:
-    - Fixed: Mass of turrets spawning on level 50
-
-
-
-1.6 Changelog:
-
-    UI:
-    - UI changes
-
-    Camera:
-    - New: Camera rotation based on velocity (togglable in settings)
-
-    Platforms:
-    - New: Added random color darkening for variation
-
-    Turrets:
-    - Removed: Bouncing off turrets when destroying them
-    - New: Screen shake when destroying turrets
-
-    Weather:
-    - New: Wind whooshing sound for hot levels
-    - New: Foggy weather
-    - Change: Hot weather chance when starting a new level decreased from 33% to 25%
-    - Change: Decreased wind event strength
-    - Fixed: Rainy level rain effect being at random line widths
-    - Fixed: Rainy level rain sounds looping awkwardly
-    - Fixed: Added continuity with wind events across game instances
-
-    Bubs:
-    - Change: Decreased Bub detection radius from 75 to 30 meters
-
-    Super jump:
-    - New: Added SFX to communicate when a super jump can be used and when your bar is at max
-
-    Bug fixes:
-    - Fixed: Hit and stay buttons for blackjack appearing in the main menu
-    - Fixed: Hooligans moving around and attacking the player when in the main menu
-
-    OTHER:
-    - Change: Changed game icon to resemble a hooligan
-]]
-
     Debug = false
 
     TimeMultiplier = 1
@@ -1283,7 +1237,7 @@ function love.draw()
         elseif GameState == "changelog" then
             love.graphics.setColor(1,1,1)
             love.graphics.setFont(Fonts.changelog)
-            love.graphics.print(Changelog, 10, 10)
+            love.graphics.print(Changelog, 10, 10 + ChangelogYOffset)
         end
     end
 
@@ -2432,7 +2386,27 @@ function InitialiseMenuButtons()
     end, function (self)
         return GameState == "settings"
     end)
-    NewButton("graphics", CENTERX - width / 2, CENTERY - 00, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    NewButton("camera rotation", CENTERX - width / 2, CENTERY - 100, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+        Settings.cameraRotationOn = not Settings.cameraRotationOn
+        SaveData()
+    end, function (self)
+        self.text = "Camera rotation: " .. (Settings.cameraRotationOn and "On" or "Off")
+        self.textColor = (Settings.cameraRotationOn and {0,1,0} or {1,0,0})
+        self.lineColor = self.textColor
+    end, function (self)
+        return GameState == "settings"
+    end)
+    NewButton("weather darkening", CENTERX - width / 2, CENTERY - 00, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+        Settings.weatherDarkening = not Settings.weatherDarkening
+        SaveData()
+    end, function (self)
+        self.text = "Weather darkening: " .. (Settings.weatherDarkening and "On" or "Off")
+        self.textColor = (Settings.weatherDarkening and {0,1,0} or {1,0,0})
+        self.lineColor = self.textColor
+    end, function (self)
+        return GameState == "settings"
+    end)
+    NewButton("graphics", CENTERX - width / 2, CENTERY + 100, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         Settings.graphics.current = Settings.graphics.current + 1
         if Settings.graphics.current > Settings.graphics.max then Settings.graphics.current = 1 end
         if Settings.graphics.current >= 2 then
@@ -2447,18 +2421,9 @@ function InitialiseMenuButtons()
     end, function (self)
         return GameState == "settings"
     end)
-    NewButton("camera rotation", CENTERX - width / 2, CENTERY - 100, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
-        Settings.cameraRotationOn = not Settings.cameraRotationOn
-        SaveData()
-    end, function (self)
-        self.text = "Camera rotation: " .. (Settings.cameraRotationOn and "On" or "Off")
-        self.textColor = (Settings.cameraRotationOn and {0,1,0} or {1,0,0})
-        self.lineColor = self.textColor
-    end, function (self)
-        return GameState == "settings"
-    end)
 
-    NewButton("Back", CENTERX - width / 2, CENTERY + 300, width, 60, "center", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+    width = 200
+    NewButton("Back", love.graphics.getWidth() - width - 40, love.graphics.getHeight() - 60, width, 40, "right", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
         GameState = "menu"
     end, nil, function (self)
         return GameState == "settings" or GameState == "changelog"

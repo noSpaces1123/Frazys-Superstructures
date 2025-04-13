@@ -172,9 +172,11 @@ function DrawWeatherOverlay()
     love.graphics.setBlendMode("alpha")
 
     if Weather.currentType == "rainy" then
-        local color = Weather.types[Weather.currentType].secondOverlay
-        love.graphics.setColor(color[1], color[2], color[3], Weather.strength * color[4])
-        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+        if Settings.weatherDarkening then
+            local color = Weather.types[Weather.currentType].secondOverlay
+            love.graphics.setColor(color[1], color[2], color[3], Weather.strength * color[4])
+            love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+        end
 
         love.graphics.setLineWidth(1)
         for _ = 1, Weather.strength * 300 do
@@ -196,9 +198,11 @@ function DrawWeatherOverlay()
 
         love.graphics.setBlendMode("alpha")
     elseif Weather.currentType == "foggy" then
-        local color = Weather.types[Weather.currentType].secondOverlay
-        love.graphics.setColor(color[1], color[2], color[3], Weather.strength * color[4])
-        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+        if Settings.weatherDarkening then
+            local color = Weather.types[Weather.currentType].secondOverlay
+            love.graphics.setColor(color[1], color[2], color[3], Weather.strength * color[4])
+            love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+        end
     end
 end
 

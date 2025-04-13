@@ -178,7 +178,7 @@ function UpdateTurrets()
                     GainPlinks(1)
                 end
 
-                Player.xvelocity, Player.yvelocity = Player.xvelocity * 3, Player.yvelocity * 3
+                Player.xvelocity, Player.yvelocity = Player.xvelocity * Player.speedMultiplierWhenDestroyingTurret, Player.yvelocity * Player.speedMultiplierWhenDestroyingTurret
 
                 PlayerSkill.turretsDestroyed = PlayerSkill.turretsDestroyed + 1
 

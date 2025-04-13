@@ -23,6 +23,7 @@ function LoadPlayer()
         doubleJumpUsed = false,
         enemyKillForgiveness = 3.5, destroyingTurretFireRateRangeDiminishment = 270,
         selfDestruct = { current = 0, max = 100 },
+        speedMultiplierWhenDestroyingTurret = 2,
     }
     Player.jumpStrength = Player.baseJumpStrength
     Player.speed = Player.baseSpeed
@@ -249,22 +250,25 @@ function love.mousereleased()
 end
 
 function love.wheelmoved(_, y)
-    if not Minimap.showing then return end
+    if Minimap.showing then
+        local sound = function ()
+            PlaySFX(SFX.zoom, 0.03, 1 - Minimap.zoom + 1)
+        end
 
-    local sound = function ()
-        PlaySFX(SFX.zoom, 0.03, 1 - Minimap.zoom + 1)
+        local speed = 0.007
+        if y > 0 then
+            Minimap.zoom = Minimap.zoom + speed
+            sound()
+        elseif y < 0 then
+            Minimap.zoom = Minimap.zoom - speed
+            sound()
+        end
+
+        Minimap.zoom = Clamp(Minimap.zoom, 0.05, 0.15)
+    elseif GameState == "changelog" then
+        local textHeight = love.graphics.newText(Fonts.changelog, Changelog):getHeight() - love.graphics.getHeight() + 40
+        ChangelogYOffset = Clamp(ChangelogYOffset + y * 10, -textHeight, 0)
     end
-
-    local speed = 0.007
-    if y > 0 then
-        Minimap.zoom = Minimap.zoom + speed
-        sound()
-    elseif y < 0 then
-        Minimap.zoom = Minimap.zoom - speed
-        sound()
-    end
-
-    Minimap.zoom = Clamp(Minimap.zoom, 0.05, 0.15)
 end
 
 function love.focus(focus)
@@ -517,7 +521,7 @@ function DoPlayerCollisions()
             end
 
             if closestSide ~= nil then
-                if obj.type == "sticky" then
+                if obj.type == "sticky" and not love.keyboard.isDown("space") then
                     Player.touchingStickyObject = true
                 end
             end
@@ -565,12 +569,6 @@ end
 function ConvertXIntoYVelocity()
     Player.yvelocity = Player.yvelocity + -math.abs(Player.xvelocity) / Player.divisorWhenConvertingXToYVelocity
     Player.xvelocity = 0
-end
-
-function CalculateZoom()
-    local minVelocity = 15
-    local zoom = 1 - Clamp(math.abs(Player.xvelocity) / 200 - minVelocity / 300, 0, math.huge) / 2
-    return Clamp(zoom, .4, 1) - Player.zoom + (Weather.currentType == "foggy" and .2 or 0)
 end
 
 function DoPlayerSpeedParticles()
@@ -682,6 +680,11 @@ end
 function ConvertPlayerVelocityToCameraRotation()
     if not Settings.cameraRotationOn then return 0 end
     return math.rad(Player.xvelocity / 20)
+end
+function CalculateZoom()
+    local minVelocity = 15
+    local zoom = 1 - Clamp(math.abs(Player.xvelocity) / 200 - minVelocity / 300, 0, math.huge) / 2
+    return Clamp(zoom, .4, 1) - Player.zoom
 end
 
 function UpdateBlips()
