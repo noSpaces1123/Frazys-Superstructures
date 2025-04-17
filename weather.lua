@@ -22,9 +22,9 @@ function InitialiseWeather()
                 groundFrictionRandomness = function () return 3 * Weather.strength end,
                 overlay = {0,0,.3,.5}, secondOverlay = {0,0,0,.4},
                 update = function (self)
-                    if not SFX.rain:isPlaying() then
-                        SFX.rain:setLooping(true)
-                        PlaySFX(SFX.rain, 0.2 * Weather.strength + .02, 1)
+                    if not SFX.rainy:isPlaying() then
+                        SFX.rainy:setLooping(true)
+                        PlaySFX(SFX.rainy, 0.2 * Weather.strength + .02, 1)
                     end
 
                     for _, obj in ipairs(Objects) do
@@ -53,7 +53,7 @@ function InitialiseWeather()
                             Weather.windEvents.duration = Weather.windEvents.duration - 1 * GlobalDT
 
                             if Weather.windEvents.duration <= 0 then
-                                PlaySFX(SFX.windOver, 0.2, 1)
+                                PlaySFX(SFX.intel, 0.2, 1)
                                 NewMessage("WIND EVENT OVER", 0, -50, {1,0,0}, 300, Fonts.medium, nil, true)
                             end
                         end

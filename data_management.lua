@@ -5,12 +5,12 @@ function SaveData()
     end
 
     local data = {
-        bubs = Bubs, objects = Objects, turrets = Turrets, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
+        bubs = Bubs, objects = Objects, turrets = Enemies, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
         level = Level, player = { x = Player.x, y = Player.y, xvelocity = Player.xvelocity, yvelocity = Player.yvelocity, temperature = Player.temperature, superJump = Player.superJump },
         playerSkill = { turretsDestroyed = PlayerSkill.turretsDestroyed, deaths = PlayerSkill.deaths, greatestBulletPresence = PlayerSkill.greatestBulletPresence, enemiesKilled = PlayerSkill.enemiesKilled },
         wayPoints = WayPoints, playerPerks = PlayerPerks, timeOnThisLevel = TimeOnThisLevel, dialogueDone = dialogueDone, totalTime = TotalTime, deathPositions = DeathPositions,
         enemies = Enemies, bestGameCompletionTime = BestGameCompletionTime, settings = Settings, playerCanMove = PlayerCanMove, descensionLevels = Descending.onLevels, playerUpgrades = PlayerUpgrades,
-        weatherType = Weather.currentType, weatherStrength = Weather.strength, weatherWindEvent = Weather.windEvents, plinks = Plinks,
+        weatherType = Weather.currentType, weatherStrength = Weather.strength, weatherWindEvent = Weather.windEvents, plinks = Plinks, descending = Descending.doingSo,
     }
 
     love.filesystem.write("data.csv", lume.serialize(data))
@@ -28,7 +28,7 @@ function LoadData()
 
     Bubs = (data.bubs and data.bubs or {})
     Objects = (data.objects and data.objects or {})
-    Turrets = (data.turrets and data.turrets or {})
+    Enemies = (data.turrets and data.turrets or {})
     Checkpoints = (data.checkpoints and data.checkpoints or {})
     WayPoints = (data.wayPoints and data.wayPoints or {})
     Shrines = (data.shrines and data.shrines or {})
@@ -38,10 +38,11 @@ function LoadData()
     BestGameCompletionTime = (data.bestGameCompletionTime and data.bestGameCompletionTime or nil)
     DeathPositions = (data.deathPositions and data.deathPositions or {})
     Enemies = (data.enemies and data.enemies or {})
-    Weather.currentType = (data.weatherType and data.weatherType or lume.weightedchoice(WeatherPalette))
+    Weather.currentType = (data.weatherType and data.weatherType or "clear")
     Weather.strength = (data.weatherStrength and data.weatherStrength or math.random())
     Descending.onLevels = (data.descensionLevels and data.descensionLevels or PickDescensionLevels())
     Plinks = (data.plinks and data.plinks or 0)
+    Descending.doingSo = (data.descending and data.descending or false)
 
     if data.playerUpgrades then
         PlayerUpgrades = data.playerUpgrades

@@ -24,6 +24,7 @@ function LoadPlayer()
         enemyKillForgiveness = 3.5, destroyingTurretFireRateRangeDiminishment = 270,
         selfDestruct = { current = 0, max = 100 },
         speedMultiplierWhenDestroyingTurret = 2,
+        invisible = false, draw = true,
     }
     Player.jumpStrength = Player.baseJumpStrength
     Player.speed = Player.baseSpeed
@@ -134,7 +135,7 @@ function love.keypressed(key)
             RunCommandLine()
         end
     elseif not Player.respawnWait.dead and key ~= "d" and key ~= "a" and not CommandLine.typing then
-        table.insert(KeyBuffer, { key = key, time = 10 })
+        table.insert(KeyBuffer, { key = key, time = 5 })
     end
 end
 
@@ -266,7 +267,7 @@ function love.wheelmoved(_, y)
 
         Minimap.zoom = Clamp(Minimap.zoom, 0.05, 0.15)
     elseif GameState == "changelog" then
-        local textHeight = love.graphics.newText(Fonts.changelog, Changelog):getHeight() - love.graphics.getHeight() + 40
+        local textHeight = love.graphics.newText(Fonts.changelog, Changelog):getHeight() - love.graphics.getHeight() + 90
         ChangelogYOffset = Clamp(ChangelogYOffset + y * 10, -textHeight, 0)
     end
 end
@@ -282,7 +283,7 @@ function love.quit()
 end
 
 function DrawPlayer()
-    if Player.respawnWait.dead or NextLevelAnimation.running then return end
+    if Player.respawnWait.dead or NextLevelAnimation.running or not Player.draw then return end
 
     --[[
     love.graphics.setColor(Player.color[1], Player.color[2], Player.color[3], .3)
@@ -308,7 +309,7 @@ function DrawPlayer()
     local closestDistance = seeRadius
     local toX, toY = Player.centerX - Player.xvelocity, Player.centerY - Player.yvelocity
 
-    for _, turret in ipairs(Turrets) do
+    for _, turret in ipairs(Enemies) do
         local distance = Distance(Player.centerX, Player.centerY, turret.x, turret.y)
         if distance < closestDistance then
             closestDistance = distance
@@ -661,9 +662,11 @@ function DoPlayerSpawnParticles()
 end
 
 function CheckAndIfSoDoPlayerSmash(objIndex)
-    if math.abs(Player.xvelocity) < Player.smashSpeedThreshold then return end
+    if Player.netSpeed < Player.smashSpeedThreshold or Player.yvelocity > 0 then return end
 
     ShakeIntensity = 30
+
+    StartSlowMo(false, false, false)
 
     if not Objects[objIndex].impenetrable then
         SmashObject(Objects[objIndex])
@@ -763,6 +766,8 @@ function KillPlayer()
     Paused = false
     SlowMo.running = false
     SlowMo.current = 0
+
+    TimeMultiplier = 1
 end
 function UpdatePlayerRespawnWait()
     if not Player.respawnWait.dead then return end
@@ -803,7 +808,7 @@ function UpdatePlayerSuperJumpBar()
     end
 end
 function DrawPlayerSuperJumpBar()
-    if not Dialogue.list[13].done then return end
+    if not Dialogue.list[13].done or not Player.draw then return end
 
     local width, height = 200, 30
     local padding = 20
@@ -930,7 +935,7 @@ function CheckCollisionWithCheckpoints()
                     end))
                 end
 
-                for _, turret in ipairs(Turrets) do
+                for _, turret in ipairs(Enemies) do
                     if Distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
                         ExplodeTurret(turret)
                     end
@@ -1158,71 +1163,6 @@ function GuardianAngelGlide()
             end
         end))
     end
-end
-
-function UpdateDialogue()
-    for index, dialogue in ipairs(Dialogue.list) do
-        if dialogue.when() and not dialogue.done then
-            PlayDialogue(index)
-            dialogue.done = true
-        end
-    end
-
-    if Dialogue.playing.running then
-        if Dialogue.playing.finished then
-            Dialogue.playing.text = string.sub(Dialogue.playing.text, 1, #Dialogue.playing.text - 1)
-            if #Dialogue.playing.text == 0 then
-                Dialogue.playing.running = false
-            end
-        elseif Dialogue.playing.charIndex > #Dialogue.playing.targetText then
-            PlayerCanMove = true
-            Dialogue.playing.postWait.current = Dialogue.playing.postWait.current + 1 * GlobalDT
-            if Dialogue.playing.postWait.current >= Dialogue.playing.postWait.max then
-                Dialogue.playing.finished = true
-            end
-        else
-            Dialogue.playing.charInterval.current = Dialogue.playing.charInterval.current + 1 * GlobalDT
-            if Dialogue.playing.charInterval.current >= Dialogue.playing.charInterval.max then
-                local charToAdd = string.sub(Dialogue.playing.targetText, Dialogue.playing.charIndex, Dialogue.playing.charIndex)
-                Dialogue.playing.charInterval.current = Dialogue.playing.charInterval.current - Dialogue.playing.charInterval.max
-                Dialogue.playing.text = Dialogue.playing.text .. charToAdd
-
-                local specialChar = false
-                for _, char in ipairs(Dialogue.playing.charInterval.maxOn) do
-                    if char.char == charToAdd then
-                        Dialogue.playing.charInterval.max = char.max
-                        specialChar = true
-                    end
-                end
-                if not specialChar then Dialogue.playing.charInterval.max = Dialogue.playing.charInterval.defaultMax end
-
-                Dialogue.playing.charIndex = Dialogue.playing.charIndex + 1
-
-                PlaySFX(SFX.dialogue, 0.6, math.random()/2+.7)
-            end
-        end
-    end
-end
-function PlayDialogue(index, event)
-    Dialogue.playing.text = ""
-    Dialogue.playing.charInterval.current = 0
-    Dialogue.playing.charIndex = 1
-    Dialogue.playing.charInterval.max = Dialogue.playing.charInterval.defaultMax
-    Dialogue.playing.running = true
-    Dialogue.playing.targetText = (event ~= nil and Dialogue.eventual[event][index] or Dialogue.list[index].text)
-    Dialogue.playing.finished = false
-    Dialogue.playing.postWait.current = 0
-end
-function DrawDialogue()
-    if not Dialogue.playing.running then return end
-    DrawTextWithBackground(Dialogue.playing.text, Player.centerX, Player.y - 100, Fonts.dialogue, {0,1,1}, {0,0,0})
-end
-function TriggerDialogue(index)
-    if index > #Dialogue.list then error("looks like you're tryna trigger dialogue that doesn't exist fool") end
-    if Dialogue.list[index].done then return end
-
-    Dialogue.list[index].done = true
-    PlayDialogue(index)
 end
 
 function UpdateEffectsOfPlayerSelfDestruct()

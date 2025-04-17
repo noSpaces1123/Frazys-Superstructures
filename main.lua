@@ -1,4 +1,5 @@
 function love.load()
+---@diagnostic disable-next-line: lowercase-global
     lume = require "lume"
     require "player"
     require "particle"
@@ -9,6 +10,7 @@ function love.load()
     require "bub"
     require "weather"
     require "changelog"
+    require "dialogue"
 
     NameOfTheGame = "Frazy's Superstructures"
 
@@ -51,16 +53,18 @@ function love.load()
         drawCard = love.audio.newSource("assets/sfx/draw card.wav", "static"),
         bust = love.audio.newSource("assets/sfx/bust.wav", "static"),
         blackjackSpotOn = love.audio.newSource("assets/sfx/blackjack spot-on.wav", "static"),
-        rain = love.audio.newSource("assets/sfx/rain.mp3", "stream"),
+        rainy = love.audio.newSource("assets/sfx/rain.mp3", "stream"),
         selfDestruct = love.audio.newSource("assets/sfx/self destruct.wav", "static"),
         push = love.audio.newSource("assets/sfx/push.wav", "static"),
         wind = love.audio.newSource("assets/sfx/wind.wav", "static"),
         windWarning = love.audio.newSource("assets/sfx/wind warning.wav", "static"),
-        windOver = love.audio.newSource("assets/sfx/wind over.wav", "static"),
+        intel = love.audio.newSource("assets/sfx/wind over.wav", "static"),
         windy = love.audio.newSource("assets/sfx/windy.mp3", "stream"),
         superJump = love.audio.newSource("assets/sfx/super jump.wav", "static"),
         superJumpReplenish = love.audio.newSource("assets/sfx/super jump replenish.wav", "static"),
         superJumpFull = love.audio.newSource("assets/sfx/super jump full.wav", "static"),
+        poof = love.audio.newSource("assets/sfx/poof.wav", "static"),
+        changeWeather = love.audio.newSource("assets/sfx/change weather.wav", "static"),
         checkpointFizzleOut = {
             love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
             love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
@@ -87,6 +91,7 @@ function love.load()
     SFX.superJumpFull:setEffect("reverb")
     SFX.superJumpReplenish:setEffect("reverb")
     SFX.superJump:setEffect("reverb")
+    SFX.poof:setEffect("reverb")
 
     for _, sfx in ipairs(SFX.foggyEnemySmash) do
         sfx:setEffect("reverb")
@@ -183,13 +188,21 @@ function love.load()
     ObjectGlobalData = {
         cornerRadius = 3,
         strokeWidth = 4,
+        beamStrokeWidth = 50, beamColor = {.06,.06,.06},
         objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000014, shrineDensity = 0.0000000005, bubDensity = 0.000000002,
         groundZeroNotchSpacing = 100, groundZeroNotchLength = 20,
         dangerPulseProgression = { current = 0, max = 500 },
         jumpPlatformStrength = 40,
+        scaleFactor = {
+            current = 0,
+            find = function ()
+                return math.random() * 1.3 + 0.4
+            end,
+        }
     }
     ObjectGlobalData.objectsToGenerate = ObjectGlobalData.objectDensity * Boundary.width * Boundary.height
     ObjectGlobalData.turretDensity = ObjectGlobalData.baseTurretDensity
+    ObjectGlobalData.scaleFactor.current = ObjectGlobalData.scaleFactor.find()
 
     TurretGlobalData = {
         height = 50,
@@ -211,7 +224,7 @@ function love.load()
         speed = { min = 3, max = 8, divide = 10 },
         viewRadius = { min = 800, max = 1000 },
         bounceReverberation = 0.4,
-        airFriction = 0.05,
+        airFriction = 0.05, rotationFriction = 0.001,
         minSpeedAgainstWallToDie = 32,
         warble = { min = 1000, max = 4000 },
         shortCircuitTime = { min = 60, max = 120 },
@@ -426,7 +439,75 @@ function love.load()
                         self.wait.current = self.wait.current - 1 * GlobalDT
                     end
                 end
-            }
+            },
+            ["Wygore"] = {
+                width = 20, height = 50, color = { 1, 1, 1 },
+                wait = { current = 300, max = 300 },
+                voiceLines = {
+                    greeting = {
+                        "Beware the decrepit hooligans... Destruction awaits you.",
+                        "Visitor. Good day. Hold [SPACE] to negate the stickiness of sticky platforms.",
+                        "Hello. Use [SPACE] just before hitting a jump pad to get an extra boost.",
+                        "Greetings. See me again and I may just give you some of my wisdom.",
+                        "Hello. Use the wind events in rainy levels to easily kill hooligans.",
+                        "Good day. Decrepit hooligans can be killed.",
+                        "Howdy. Hooligans are more orange the slower they are.",
+                        "Hello. When a hooligan targets you, they make a lower-pitched sound the bigger they are.",
+                    },
+                },
+                event = function (self, bub, bubIndex, event)
+                    if event == "left" then
+                        bub.disabled = true
+
+                        for _ = 1, 40 do
+                            table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {1,1,1,math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
+                        end
+
+                        PlaySFX(SFX.poof, .4, .5)
+                    end
+                end
+            },
+            ["Marvin"] = {
+                width = 10, height = 10, color = { 116/255, 46/255, 1 },
+                wait = { current = 300, max = 300 },
+                voiceLines = {
+                    greeting = {
+                        "Hello! I'm Marvin, and I'm a magic weatherman. Do you wish to change the weather? I'm magic, so I can do that!",
+                    },
+                },
+                event = function (self, bub, bubIndex, event)
+                    if event == "change weather" then
+                        bub.disabled = true
+                        for _ = 1, 40 do
+                            table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {self.color[1],self.color[2],self.color[3],math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
+                        end
+                        PlaySFX(SFX.poof, .4, .5)
+
+                        local choices = {}
+                        for key, _ in pairs(Weather.types) do
+                            if key ~= Weather.currentType then table.insert(choices, key) end
+                        end
+                        Weather.currentType = lume.randomchoice(choices)
+
+                        PlaySFX(SFX.changeWeather, .4, 1)
+                        SFX.windy:stop()
+                        SFX.rainy:stop()
+
+                        Player.bubEngagementIndex = nil
+                        bub.says = nil
+
+                        if Weather.currentType == "foggy" then
+                            for _, enemy in ipairs(Enemies) do
+                                enemy.width = enemy.width * Weather.types.foggy.enemySizeMultiplier
+                                enemy.speed = enemy.speed * Weather.types.foggy.enemySpeedMultiplier
+                            end
+                            Turrets = {}
+                        elseif Settings.musicOn then
+                            Music:play()
+                        end
+                    end
+                end
+            },
         }
     }
 
@@ -541,423 +622,6 @@ function love.load()
     Descending.music:setLooping(true)
     Descending.music:setVolume(0.5)
 
-    Dialogue = {
-        index = 1,
-        playing = {
-            text = "", targetText = nil,
-            charInterval = { current = 0, max = 2, defaultMax = 2,
-                maxOn = { { char = ".", max = 20 }, { char = ",", max = 10 }, { char = "!", max = 20 }, { char = "?", max = 30 }, { char = "-", max = 40 } } },
-            charIndex = 1,
-            finished = false,
-            postWait = { current = 0, max = 200 },
-            running = false,
-        },
-        list = {
-            {
-                text = "I hope my team knows what they're doing sending me here. I hear this place is dangerous, but all I need to do is reach the top of each level.",
-                when = function () return
-                    Level == 1
-                end
-            },
-            {
-                text = "I wonder if I can destroy that turret by hitting it...",
-                when = function ()
-                    for _, turret in ipairs(Turrets) do
-                        if turret.seesPlayer then
-                            return true
-                        end
-                    end
-                    return false
-                end
-            },
-            {
-                text = "Nice. Let's do that if they're ever a problem again.",
-                when = function ()
-                    return PlayerSkill.turretsDestroyed == 1
-                end
-            },
-            {
-                text = "I'm really getting the hang of this!",
-                when = function ()
-                    return PlayerSkill.turretsDestroyed == 10
-                end
-            },
-            {
-                text = "It's about time these guys got a taste of their own medicine.",
-                when = function ()
-                    return PlayerSkill.turretsDestroyed == 50
-                end
-            },
-            {
-                text = "Ouch! That's hot. I'll be in big trouble if my temperature meter reaches 100%... Maybe I can cool down on those ice platforms?",
-                when = function ()
-                    return Player.temperature.current > 0
-                end
-            },
-            {
-                text = "Next level. Let's do this.",
-                when = function ()
-                    return Level == 2
-                end
-            },
-            {
-                text = "Those orange turrets heat me up. I should stay away.",
-                when = function ()
-                    local yes = false
-                    for _, turret in ipairs(Turrets) do
-                        if turret.seesPlayer and turret.type == "laser" then
-                            yes = true
-                        end
-                    end
-                    return Level >= 2 and yes and Dialogue.list[3].done
-                end
-            },
-            {
-                text = "Those blue turrets just fire bullets, I suppose.",
-                when = function ()
-                    local yes = false
-                    for _, turret in ipairs(Turrets) do
-                        if turret.seesPlayer and turret.type == "normal" then
-                            yes = true
-                        end
-                    end
-                    return Level >= 2 and yes and Dialogue.list[3].done
-                end
-            },
-            {
-                text = "Those yellow turrets pull me in, but don't do any damage.",
-                when = function ()
-                    local yes = false
-                    for _, turret in ipairs(Turrets) do
-                        if turret.seesPlayer and turret.type == "drag" then
-                            yes = true
-                        end
-                    end
-                    return Level >= 2 and yes and Dialogue.list[3].done
-                end
-            },
-            {
-                text = "It looks like the height of the levels increases every ten levels. Let's keep that in mind.",
-                when = function ()
-                    return Level == 10
-                end
-            },
-            {
-                text = "First death...",
-                when = function ()
-                    return PlayerSkill.deaths == 1
-                end
-            },
-            {
-                text = "Intel said I've got a special ability I can use with [Q], as long as I have enough charge in the top left bar. A fixed amount is removed from the bar with every use.",
-                when = function ()
-                    return Level == 5
-                end
-            },
-            {
-                text = "Intel said I can use [M] to open up the minimap.",
-                when = function ()
-                    return AnalyticsUpgrades["minimap"]
-                end
-            },
-            {
-                text = "Whee!",
-                when = function ()
-                    return Player.netSpeed >= 50
-                end
-            },
-            {
-                text = "Perfect. Now, when I die, I'll respawn here. Intel says these checkpoints also destroy turrets and those bastard hooligans nearby.",
-                when = function ()
-                    return Player.checkpoint.x ~= nil
-                end
-            },
-            {
-                text = "That's a lot of bullets!",
-                when = function ()
-                    return PlayerSkill.greatestBulletPresence >= 10
-                end
-            },
-            {
-                text = "Whoa!",
-                when = function ()
-                    return PlayerSkill.greatestBulletPresence >= 3
-                end
-            },
-            {
-                text = "Holy cow...",
-                when = function ()
-                    return PlayerSkill.greatestBulletPresence >= 15
-                end
-            },
-            {
-                text = "So that's what the strange signals were... What's different now?",
-                when = function ()
-                    local yes = false
-                    for _, active in pairs(PlayerPerks) do
-                        if active then
-                            yes = true
-                        end
-                    end
-                    return yes
-                end
-            },
-            {
-                text = "Victor at Intel said I only need to reach level 50 to get enough info and head home.",
-                when = function ()
-                    return Level >= 11
-                end
-            },
-            {
-                text = "That's hot!",
-                when = function ()
-                    return Level >= 3 and Player.temperature.current / Player.temperature.max >= 0.8
-                end
-            },
-            {
-                text = "These levels don't seem to be too complex, but I have a feeling more and more turrets are piling up...",
-                when = function ()
-                    return Level >= 12
-                end
-            },
-            {
-                text = "The turrets are definitely getting more frequent.",
-                when = function ()
-                    return Level >= 13
-                end
-            },
-            {
-                text = "Intel said they're getting strange signals from each of these levels... I should explore to find out what they are.",
-                when = function ()
-                    local condition = Level >= 15 and Player.y <= Boundary.y + Boundary.height / 2
-                    if condition and #Shrines == 0 then SpawnShrines() end
-                    return condition
-                end
-            },
-            {
-                text = "Whoa! That guy's out to get me, but he doesn't seem very clever.",
-                when = function ()
-                    local yes = false
-                    for _, enemy in ipairs(Enemies) do
-                        if enemy.seesPlayer then
-                            yes = true
-                        end
-                    end
-                    return yes
-                end
-            },
-            {
-                text = "Here we go again! Let's see if I can get more data faster than before.",
-                when = function ()
-                    return BestGameCompletionTime ~= nil
-                end
-            },
-            {
-                text = "Halfway done. 25 levels left.",
-                when = function ()
-                    return Level == 25
-                end
-            },
-            {
-                text = "Boom. 100th turret dead.",
-                when = function ()
-                    return PlayerSkill.turretsDestroyed == 100
-                end
-            },
-            {
-                text = "Those guys are gonna be annoying.",
-                when = function ()
-                    return PlayerSkill.enemiesKilled == 1
-                end
-            },
-            {
-                text = "That's 10 of those bastards down.",
-                when = function ()
-                    return PlayerSkill.enemiesKilled == 10
-                end
-            },
-            {
-                text = "Enemy number 100 dead.",
-                when = function ()
-                    return PlayerSkill.enemiesKilled == 100
-                end
-            },
-            {
-                text = "Let's just finish this level already.",
-                when = function ()
-                    return TimeOnThisLevel >= 5 * 60
-                end
-            },
-            {
-                text = "Why is this level taking so long...",
-                when = function ()
-                    return TimeOnThisLevel >= 10 * 60
-                end
-            },
-            {
-                text = "All the intel under an hour, done. Once a boy- now a man.",
-                when = function ()
-                    return BestGameCompletionTime ~= nil and BestGameCompletionTime < 60 * 60
-                end
-            },
-            {
-                text = "How did I even pull off that last run?",
-                when = function ()
-                    return BestGameCompletionTime ~= nil and BestGameCompletionTime < 5 * 60
-                end
-            },
-            {
-                text = "WWHHHHHAAAAAAAA!!!",
-                when = function ()
-                    return Player.yvelocity < -140
-                end
-            },
-            {
-                text = "I need a damn coffee.",
-                when = function ()
-                    return Player.netSpeed <= 0.1 and Level == 50 and Player.y < Boundary.y + Boundary.height / 3
-                end
-            },
-            {
-                text = "I need a goddamn coffee.",
-                when = function ()
-                    return BestGameCompletionTime ~= nil and Player.netSpeed <= 0.1 and Level == 50 and Player.y < Boundary.y + Boundary.height / 3
-                end
-            },
-            {
-                text = "Almost there!",
-                when = function ()
-                    return Level == 50 and Player.y < Boundary.y + Boundary.height / 4
-                end
-            },
-            {
-                text = "Almost!!",
-                when = function ()
-                    return Level == 50 and Player.y < Boundary.y + Boundary.height / 7
-                end
-            },
-            {
-                text = "These levels are getting really tall.",
-                when = function ()
-                    return Level == 30
-                end
-            },
-            {
-                text = "I hate those hooligans.",
-                when = function ()
-                    return PlayerSkill.enemiesKilled >= 20
-                end
-            },
-            {
-                text = "God save me.",
-                when = function ()
-                    return PlayerSkill.greatestBulletPresence >= 22
-                end
-            },
-            {
-                text = "I think I can kill those red hooligans by hitting them with more speed than when they hit me.",
-                when = function ()
-                    return Level >= 4
-                end
-            },
-            {
-                text = "Around about 60% done. Intel doesn't need much more, let's finish this.",
-                when = function ()
-                    return Level == 31
-                end
-            },
-            {
-                text = "Ten levels left!",
-                when = function ()
-                    return Level == 40
-                end
-            },
-            {
-                text = "10 deaths thus far...",
-                when = function ()
-                    return PlayerSkill.deaths == 10
-                end
-            },
-            {
-                text = "10 deaths.",
-                when = function ()
-                    return BestGameCompletionTime ~= nil and PlayerSkill.deaths == 10
-                end
-            },
-            {
-                text = "This is the final level. Let's do this.",
-                when = function ()
-                    return Level == 50
-                end
-            },
-            {
-                text = "Whoa! That was insane. I can't believe I made it outta there! Let's hope I don't have to go through that again...",
-                when = function ()
-                    return Level == Descending.onLevels[1] + 1
-                end
-            },
-            {
-                text = "Intel says I can use [SHIFT] to get some extra sight.",
-                when = function ()
-                    return Level == 7
-                end
-            },
-            {
-                text = "All the intel collected in under an hour and a half! But I bet I can do it faster.",
-                when = function ()
-                    return BestGameCompletionTime ~= nil and BestGameCompletionTime < 90 * 60
-                end
-            },
-            {
-                text = "([P] to pause)",
-                when = function ()
-                    return Level == 1 and Player.y <= Boundary.y + Boundary.height / 2 and not Dialogue.playing.running
-                end
-            },
-            {
-                text = "I guess I did have to go through that again! And it was more difficult this time...",
-                when = function ()
-                    return Level == Descending.onLevels[2] + 1
-                end
-            },
-            {
-                text = "That's cold!",
-                when = function ()
-                    return not Dialogue.playing.running and Weather.currentType == "rainy"
-                end
-            },
-            {
-                text = "Looks like checkpoints don't work in the rain...",
-                when = function ()
-                    return false
-                end
-            },
-            {
-                text = "Intel says that every 10 plinks, I'm able to get an upgrade as a reward for the data I collect!",
-                when = function ()
-                    return false
-                end
-            },
-        },
-        eventual = {
-            killEnemy = {
-                "Nice.",
-                "Take that.",
-                "Eat it.",
-                "Ha-ha!",
-                "Idiot.",
-                "Oh yeah.",
-                "How cute.",
-                "Beat that.",
-                "Goof.",
-                "Hole in one.",
-                "Who's the man?",
-                "No mercy.",
-                "What's it to ya?",
-            },
-        },
-    }
-
     PlayerCanMove = false
 
     DeathPositions = {}
@@ -968,7 +632,7 @@ function love.load()
 
     Buttons = {}
     InitialiseMenuButtons()
-    InitialiseBlackjackButtons()
+    InitialiseBubButtons()
 
     InitialiseUpgrades()
 
@@ -981,7 +645,7 @@ function love.load()
         ResetPlayerData()
     end
 
-    if Settings.musicOn and not Weather.currentType == "foggy" then Music:play() end
+    if Settings.musicOn and Weather.currentType ~= "foggy" then Music:play() end
 
     MessageWithPlayerStats()
 
@@ -1255,6 +919,7 @@ function love.draw()
 end
 function DrawGameFrame()
     DrawBG()
+    DrawBeams()
     DrawParticles()
     DrawObjects()
     DrawDeathPositions()
@@ -1409,6 +1074,20 @@ function DrawObjects()
         ::continue::
     end
 end
+function DrawBeams()
+    for _, obj in ipairs(Objects) do
+        if not obj.withinRenderDistance or not obj.beams then goto continue end
+
+        love.graphics.setColor(ObjectGlobalData.beamColor)
+        love.graphics.setLineWidth(ObjectGlobalData.beamStrokeWidth)
+
+        for _, beam in ipairs(obj.beams) do
+            love.graphics.line(obj.x+obj.width/2, obj.y+obj.height/2, beam.x, beam.y)
+        end
+
+        ::continue::
+    end
+end
 function GenerateObjects()
     DeathPositions = {}
 
@@ -1449,7 +1128,7 @@ function GenerateObjects()
 
         return {
             x = x, y = y,
-            width = width, height = height, type = objectType,
+            width = width * ObjectGlobalData.scaleFactor.current, height = height * ObjectGlobalData.scaleFactor.current, type = objectType,
             darkGrading = math.random() / 10,
         }
     end
@@ -1457,8 +1136,33 @@ function GenerateObjects()
     math.randomseed(Seed)
 
     -- objs
-    for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height do
+    for _ = 1, ObjectGlobalData.objectDensity * Boundary.width * Boundary.height * (2 - ObjectGlobalData.scaleFactor.current) do
         table.insert(Objects, newObj())
+    end
+
+    -- beams
+    for _, obj in ipairs(Objects) do
+        local beams = {}
+
+        local maxDistance = ToPixels(5)
+
+        for _ = 1, math.random(1,3) do
+            local candidates = {}
+            for _, candidate in ipairs(Objects) do
+                if candidate.x == obj.x and candidate.y == obj.y or Distance(obj.x+obj.width/2, obj.y+obj.height/2, candidate.x+candidate.width/2, candidate.y+candidate.height/2) > maxDistance then goto continue end
+
+                table.insert(candidates, candidate)
+
+                ::continue::
+            end
+
+            if #candidates > 0 then
+                local choice = lume.randomchoice(candidates)
+                table.insert(beams, { x = choice.x+choice.width/2, y = choice.y+choice.height/2 })
+            end
+        end
+
+        obj.beams = beams
     end
 
     -- posters
@@ -1550,6 +1254,8 @@ function DiscoverAndRenderDiscoverables()
         else
             obj.render = false
         end
+
+        obj.withinRenderDistance = Distance(obj.x+obj.width/2, obj.y+obj.height/2, Player.centerX, Player.centerY) <= Player.renderDistance
     end
 
     for _, turret in ipairs(Turrets) do
@@ -1642,8 +1348,14 @@ function NextLevel()
         Level = Level + 1
         Seed = os.time()
 
-        Weather.currentType = lume.weightedchoice(WeatherPalette)
-        Weather.strength = math.random()
+        ObjectGlobalData.scaleFactor.current = ObjectGlobalData.scaleFactor.find()
+
+        if Level >= 10 then
+            Weather.currentType = lume.weightedchoice(WeatherPalette)
+            Weather.strength = math.random()
+        else
+            Weather.currentType = "clear"
+        end
 
         PlaySFX(SFX.nextLevel, .4, 1)
         CorrectBoundaryHeight()
@@ -1667,7 +1379,7 @@ function NextLevel()
             Music:play()
         end
 
-        SFX.rain:stop()
+        SFX.rainy:stop()
         SFX.windy:stop()
     end
 end
@@ -1880,6 +1592,7 @@ end
 
 function DrawDisplays()
     if Weather.currentType == "rainy" and math.random() > 1 - Weather.strength / 2 then return end
+    if not Player.draw then return end
 
     local generalPadding = 5
 
@@ -2371,6 +2084,11 @@ function InitialiseMenuButtons()
     end, nil, function (self)
         return GameState == "menu"
     end)
+    NewButton("Remove me", x, CENTERY + 320, width, 40, "left", {.3,0,0}, {.1,0,0}, {.1,0,0}, {1,0,0}, Fonts.medium, 0, 10,10, function (self)
+        love.event.quit()
+    end, nil, function (self)
+        return GameState == "menu"
+    end)
 
     -- settings
     width = 800
@@ -2443,6 +2161,8 @@ function InitialiseMenuButtons()
             self.text = "Reset Current Run"
             PlaySFX(SFX.resetRun, 0.1, 1)
             ResetGame()
+            CorrectBoundaryHeight()
+            LoadPlayer()
         end
     end, nil, function (self)
         return GameState == "settings"

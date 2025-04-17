@@ -28,6 +28,8 @@ end
 end
 
 function SpawnEnemies()
+    if Level == 1 then return end
+
     Enemies = {}
 
     for _ = 1, EnemyGlobalData.enemyDensity * Boundary.width * Boundary.height do
@@ -44,6 +46,7 @@ function NewEnemy(x, y)
         width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max) * m, speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide * sm,
         viewRadius = math.random(EnemyGlobalData.viewRadius.min, EnemyGlobalData.viewRadius.max), seesPlayer = false,
         warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) },
+        rotationRadians = math.rad(math.random(360)), rotationVelocity = 0,
     })
 end
 
@@ -62,8 +65,16 @@ function DrawEnemies()
                 eyeColor = { v, v, v }
             end
 
+            love.graphics.push()
+            love.graphics.translate(enemy.x + enemy.width/2, enemy.y + enemy.width/2)
+
+            if not enemy.rotationRadians then enemy.rotationRadians = math.rad(math.random(360)) end
+            love.graphics.rotate(enemy.rotationRadians)
+
             love.graphics.setColor(fillColor)
-            love.graphics.rectangle("fill", enemy.x, enemy.y, enemy.width, enemy.width)
+            love.graphics.rectangle("fill", -enemy.width/2, -enemy.width/2, enemy.width, enemy.width)
+
+            love.graphics.pop()
 
             local r,g,b = love.graphics.getColor()
             love.graphics.setColor(r,g,b,.3)
@@ -118,7 +129,7 @@ function UpdateEnemies()
             local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
 
             local before = enemy.seesPlayer
-            enemy.seesPlayer = distance <= enemy.viewRadius
+            enemy.seesPlayer = distance <= enemy.viewRadius and not Player.invisible
             if enemy.seesPlayer and not before then
                 local ratio = 1 - (enemy.width - EnemyGlobalData.width.min) / (EnemyGlobalData.width.max - EnemyGlobalData.width.min)
                 PlaySFX(SFX.enemySeesPlayer, 0.6, Clamp(ratio * 1 + 1, 0.1, math.huge))
@@ -127,7 +138,7 @@ function UpdateEnemies()
                 end
             end
 
-            if distance <= Player.renderDistance then
+            if enemy.render then
                 enemy.xvelocity = ApplyWind(enemy.xvelocity)
 
                 if not Player.respawnWait.dead and not NextLevelAnimation.running and not enemy.shortCircuit.running then
@@ -147,6 +158,13 @@ function UpdateEnemies()
 
                 enemy.x = enemy.x + enemy.xvelocity * GlobalDT
                 enemy.y = enemy.y + enemy.yvelocity * GlobalDT
+
+                enemy.rotationRadians = enemy.rotationRadians + enemy.rotationVelocity * GlobalDT
+                if enemy.rotationRadians > 360 then
+                    enemy.rotationRadians = enemy.rotationRadians - 360
+                elseif enemy.rotationRadians < 0 then
+                    enemy.rotationRadians = enemy.rotationRadians + 360
+                end
 
                 if not Player.respawnWait.dead and not NextLevelAnimation.running then
                     if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
@@ -280,17 +298,21 @@ function DoEnemyCollisions(enemyIndex)
                 Enemies[enemyIndex].x = obj.x + obj.width
             end
 
-            if closestSide ~= nil and not obj.impenetrable and Weather.currentType == "foggy" and Enemies[enemyIndex].seesPlayer and lume.randomchoice({true,false}) then
-                local maxHearingDistance = ToPixels(6)
-                local distance = Distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
-                local ratio = Clamp(1 - distance / maxHearingDistance, 0, 1)
+            if closestSide ~= nil then
+                Enemies[enemyIndex].rotationVelocity = Enemies[enemyIndex].rotationVelocity + CalculateRotationVelocity(closestSide, Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity)
 
-                SmashObject(obj)
-                PlaySFX(lume.randomchoice(SFX.foggyEnemySmash), .6 * ratio, math.random() / 5 + .9)
-                ShakeIntensity = 40 * ratio
-                Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity = 0, 0
+                if not obj.impenetrable and Weather.currentType == "foggy" and Enemies[enemyIndex].seesPlayer and lume.randomchoice({true,false}) then
+                    local maxHearingDistance = ToPixels(6)
+                    local distance = Distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
+                    local ratio = Clamp(1 - distance / maxHearingDistance, 0, 1)
 
-                StartSlowMo(false, false, false)
+                    SmashObject(obj)
+                    PlaySFX(lume.randomchoice(SFX.foggyEnemySmash), .6 * ratio, math.random() / 5 + .9)
+                    ShakeIntensity = 40 * ratio
+                    Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity = 0, 0
+
+                    StartSlowMo(false, false, false)
+                end
             end
 
             obj.enemyTouchingSide = closestSide
@@ -333,6 +355,21 @@ function DoEnemyFriction(enemyIndex)
             Enemies[enemyIndex].yvelocity = 0
         end
     end
+
+    if not Enemies[enemyIndex].rotationVelocity then Enemies[enemyIndex].rotationVelocity = 0 end
+    if not Enemies[enemyIndex].rotationRadians then Enemies[enemyIndex].rotationRadians = 0 end
+
+    if Enemies[enemyIndex].rotationVelocity > 0 then
+        Enemies[enemyIndex].rotationVelocity = Enemies[enemyIndex].rotationVelocity - EnemyGlobalData.rotationFriction * GlobalDT
+        if Enemies[enemyIndex].rotationVelocity < 0 then
+            Enemies[enemyIndex].rotationVelocity = 0
+        end
+    elseif Enemies[enemyIndex].rotationVelocity < 0 then
+        Enemies[enemyIndex].rotationVelocity = Enemies[enemyIndex].rotationVelocity + EnemyGlobalData.rotationFriction * GlobalDT
+        if Enemies[enemyIndex].rotationVelocity > 0 then
+            Enemies[enemyIndex].rotationVelocity = 0
+        end
+    end
 end
 
 function ExplodeEnemy(enemy)
@@ -354,4 +391,22 @@ function ExplodeEnemy(enemy)
         end
     end
     PlaySFX(SFX.smash, 0.5, 1.5)
+end
+
+function CalculateRotationVelocity(side, xvelocity, yvelocity)
+    local divisor = 1
+    local xUltimateAdd = math.rad(xvelocity / divisor)
+    local yUltimateAdd = math.rad(yvelocity / divisor)
+
+    if side == 3 then -- top
+        return xUltimateAdd
+    elseif side == 4 then -- bottom
+        return -xUltimateAdd
+    elseif side == 1 then -- left
+        return -yUltimateAdd
+    elseif side == 2 then -- right
+        return yUltimateAdd
+    end
+
+    error("invalid side >~<")
 end

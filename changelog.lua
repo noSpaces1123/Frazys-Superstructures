@@ -11,23 +11,26 @@ Changelog = Version ..
     - Change: Adjusted weather chances (clear 42%, rainy 32%, hot 21%, foggy 5%)
     - Removed: Higher zoom in foggy levels
     - New: Added menu option to turn off weather screen darkening (to increase visibility in rainy levels)
+    - New: Weather is guaranteed clear until level 10
 
     Platforms:
     - New: Sticky platform stickiness can be negated by holding space
+    - New: Random platform scale factor for each level (correlating to platform density)
+    - New: Background beams between platforms for the sake of graphical depth (no gameplay effects)
 
     Turrets:
     - Change: Decreased velocity multiplier when destroying turrets
 
+    Bubs:
+    - New: Added Marvin the Magic Weatherman and Wygore the Wise
 
-    
-1.6.1 Changelog:
-
-    Bug fixes:
-    - Fixed: Mass of turrets spawning on level 50
+    OTHER:
+    - New: Quit button in the menu
+    - Change: Decreased input buffer time from 0.17 seconds to 0.08 seconds
 
 
 
-1.6 Changelog:
+1.6 -> 1.6.1 Changelog:
 
     UI:
     - UI changes
@@ -60,7 +63,75 @@ Changelog = Version ..
     Bug fixes:
     - Fixed: Hit and stay buttons for blackjack appearing in the main menu
     - Fixed: Hooligans moving around and attacking the player when in the main menu
+    - Fixed: Mass of turrets spawning on level 50
 
     OTHER:
     - Change: Changed game icon to resemble a hooligan
+
+
+1.5 Changelog:
+
+    Turrets:
+    - New: Push turrets
+
+    Weather:
+    - New: Added wind events to rainy levels
+
+
+1.4 -> 1.4.3.3 Changelog:
+
+    Levels:
+    - Change: Descreased jump pad spawn density
+    - Change: Generation (in terms of platform types) now work using Simplex noise
+    - New: Added weather (affects gameplay)
+
+    Timer:
+    - Fixed: Timer still counting up when dead
+
+    Minimap:
+    - Change: Made waypoints easier to remove
+    - New: Displays "Game paused." at the bottom of the screen viewing the minimap
+    - New: Turrets and Hooligans now must be discovered to appear on the minimap
+
+    Turrets and hooligans:
+    - Fixed: Targeting indicator (line from threat to player) not rendering when the threat has not been discovered
+
+    Sticky platforms:
+    - Fixed: Not being able to super-jump off of sticky platforms
+
+    QoL:
+    - New: Self-destruct with [B]
+
+    Performance:
+    - Enhanced: Significant performance enhancement
+
+    Analytics upgrade path:
+    - Change: Scale bar changed to be vertical rather than horizontal
+    - Change: Added weather info to level 1 of analytics
+
+    Weather:
+    - Change: Brightened rainy levels
+    - Change: Changed all weather types to be equally likely
+    - New: Added dialogue to make it extra clear that checkpoints don't work in rainy levels
+
+    Hooligans:
+    - Fixed: Hooligans clipping through the player with no effect
+
+    Bug fixes:
+    - Fixed: Descension level hooligan spawning not triggering
+    - Fixed: Upgrades not taking effect when moving to the next level
+    - Fixed: Random crashing
+    - Fixed: Hooligans and turrets not being cleared and regenerated each level
+    - Fixed: Random crashing (for the most part)
+    - Fixed: Crash enemy.lua:71 (getting confused about missing data)
+
+    OTHER:
+    - New: Added game icon
+    - Fixed: Fading in animation on game startup trailing into entering the game
+    - Change: Changed game font from Geo to DM Mono for better readability (especially in differentiating between '1' and '7')
+    - Removed: Level regeneration with [R] when paused
+
+
+
+Changelogs of versions prior are logged within their respective versions. They can be found in the designated Google Drive for Frazy's Superstructures.
 ]]

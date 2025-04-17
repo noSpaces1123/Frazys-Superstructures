@@ -2,6 +2,17 @@ function NewBub(x, y, type)
     table.insert(Bubs, {
         x = x, y = y, type = type, phase = nil,
     })
+
+    for _, turret in ipairs(Enemies) do
+        if Distance(turret.x, turret.y, x+BubGlobalData.types[type].width/2, y+BubGlobalData.types[type].width/2) <= turret.viewRadius + BubGlobalData.noticeDistance then
+            lume.remove(Turrets, turret)
+        end
+    end
+    for _, enemy in ipairs(Enemies) do
+        if Distance(enemy.x+enemy.width/2, enemy.y+enemy.width/2, x+BubGlobalData.types[type].width/2, y+BubGlobalData.types[type].width/2) <= enemy.viewRadius + BubGlobalData.noticeDistance then
+            lume.remove(Enemies, enemy)
+        end
+    end
 end
 
 function SpawnBubs()
@@ -35,6 +46,8 @@ end
 
 function UpdateBubs()
     for bubIndex, bub in ipairs(Bubs) do
+        if bub.disabled then goto continue end
+
         local bubData = BubGlobalData.types[bub.type]
         local distanceToPlayer = Distance(Player.centerX, Player.centerY, bub.x + bubData.width / 2, bub.y + bubData.height / 2)
 
@@ -53,7 +66,10 @@ function UpdateBubs()
         else
             bub.says = nil
             if Blackjack.playerPlaying then Blackjack.playerPlaying = false end
-            if Player.bubEngagementIndex == bubIndex then Player.bubEngagementIndex = nil end
+            if Player.bubEngagementIndex == bubIndex then
+                Player.bubEngagementIndex = nil
+                bubData.event(bubData, bub, Player.bubEngagementIndex, "left")
+            end
         end
 
         ::continue::
@@ -62,6 +78,8 @@ end
 
 function DrawBubs()
     for bubIndex, bub in ipairs(Bubs) do
+        if bub.disabled then goto continue end
+
         local distance = Distance(bub.x, bub.y, Player.centerX, Player.centerY)
         local bubData = BubGlobalData.types[bub.type]
         if distance <= Player.renderDistance then
@@ -95,6 +113,8 @@ function DrawBubs()
         if AnalyticsUpgrades["signal radar"] and distance <= BubGlobalData.maxHintDistance and distance > BubGlobalData.noticeDistance then
             DrawArrowTowards(bub.x + bubData.width / 2, bub.y + bubData.height / 2, bubData.color, 0.6, BubGlobalData.maxHintDistance)
         end
+
+        ::continue::
     end
 end
 
@@ -242,7 +262,8 @@ function DisplayBlackjackHand(person)
         DrawTextWithBackground((person == "player" and playerTotal or dealerTotal) .. ((person == "dealer" and bub.phase == "player") and " + ?" or ""), xAnchor, yAnchor - Blackjack.cards[1].sprite:getHeight() - away - 40, Fonts.medium, textColor, {0,0,0})
     end
 end
-function InitialiseBlackjackButtons()
+
+function InitialiseBubButtons()
     local spacing, width, height = 30, 200, 40
     NewButton("Hit", love.graphics.getWidth() / 2 - spacing / 2 - width, love.graphics.getHeight() - spacing - height, width, height, "center", {1,0,0}, {0,0,0}, {.2,0,0}, {1,0,0}, Fonts.normal, 0, 10,10, function (self)
         local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
@@ -277,5 +298,12 @@ function InitialiseBlackjackButtons()
         end
     end, function (self)
         return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Jack" and Bubs[Player.bubEngagementIndex].phase == "play again"
+    end)
+
+    NewButton("Sure!", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, "center", {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1}, Fonts.normal, 2, 10,10, function (self)
+        local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
+        bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "change weather")
+    end, nil, function (self)
+        return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Marvin"
     end)
 end

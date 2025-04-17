@@ -28,6 +28,8 @@ end
 end
 
 function SpawnTurrets(playerSafeArea)
+    if Level == 1 then return end
+
     Turrets = {}
 
     math.randomseed(os.time())
@@ -74,7 +76,7 @@ function UpdateTurrets()
             local distance = Distance(turret.x, turret.y, Player.centerX, Player.centerY)
 
             local before = turret.seesPlayer
-            turret.seesPlayer = distance <= turret.viewRadius
+            turret.seesPlayer = distance <= turret.viewRadius and not Player.invisible
 
             if not Player.respawnWait.dead and turret.seesPlayer and not NextLevelAnimation.running and GameState == "game" then
                 if not before and turret.seesPlayer then
