@@ -306,4 +306,11 @@ function InitialiseBubButtons()
     end, nil, function (self)
         return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Marvin"
     end)
+
+    NewButton("Sure!", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - spacing - height, width, height, "center", {1,1,1}, {0,0,0}, {.2,.2,.2}, {1,1,1}, Fonts.normal, 2, 10,10, function (self)
+        local bubData = BubGlobalData.types[Bubs[Player.bubEngagementIndex].type]
+        bubData.event(bubData, Bubs[Player.bubEngagementIndex], Player.bubEngagementIndex, "find a thing")
+    end, nil, function (self)
+        return GameState == "game" and not Paused and Player.bubEngagementIndex ~= nil and Bubs[Player.bubEngagementIndex].type == "Globu"
+    end)
 end

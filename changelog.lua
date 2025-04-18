@@ -20,13 +20,19 @@ Changelog = Version ..
 
     Turrets:
     - Change: Decreased velocity multiplier when destroying turrets
+    - New: 7% of turrets will be have personality trait peaceful or angry
+
+    Hooligans:
+    - New: 1 in 5 hooligans will run away if you're moving significantly faster than them
 
     Bubs:
-    - New: Added Marvin the Magic Weatherman and Wygore the Wise
+    - New: Added Marvin the Magic Weatherman, Wygore the Wise, and Globu the Navigator
 
     OTHER:
     - New: Quit button in the menu
+    - New: Zen mode
     - Change: Decreased input buffer time from 0.17 seconds to 0.08 seconds
+    - Removed: Cursor readings (hovering over turrets to see data)
 
 
 
@@ -43,6 +49,7 @@ Changelog = Version ..
 
     Turrets:
     - Removed: Bouncing off turrets when destroying them
+    - New: Velocity multiplier when destroying turrets
     - New: Screen shake when destroying turrets
 
     Weather:

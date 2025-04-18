@@ -1,11 +1,13 @@
 function SaveData()
+    if Zen.doingSo then return end
+
     local dialogueDone = {}
     for _, dia in ipairs(Dialogue.list) do
         table.insert(dialogueDone, dia.done == true)
     end
 
     local data = {
-        bubs = Bubs, objects = Objects, turrets = Enemies, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
+        bubs = Bubs, objects = Objects, turrets = Turrets, checkpoints = Checkpoints, shrines = Shrines, dead = Player.respawnWait.dead, checkpoint = { x = Player.checkpoint.x, y = Player.checkpoint.y },
         level = Level, player = { x = Player.x, y = Player.y, xvelocity = Player.xvelocity, yvelocity = Player.yvelocity, temperature = Player.temperature, superJump = Player.superJump },
         playerSkill = { turretsDestroyed = PlayerSkill.turretsDestroyed, deaths = PlayerSkill.deaths, greatestBulletPresence = PlayerSkill.greatestBulletPresence, enemiesKilled = PlayerSkill.enemiesKilled },
         wayPoints = WayPoints, playerPerks = PlayerPerks, timeOnThisLevel = TimeOnThisLevel, dialogueDone = dialogueDone, totalTime = TotalTime, deathPositions = DeathPositions,
@@ -28,7 +30,7 @@ function LoadData()
 
     Bubs = (data.bubs and data.bubs or {})
     Objects = (data.objects and data.objects or {})
-    Enemies = (data.turrets and data.turrets or {})
+    Turrets = (data.turrets and data.turrets or {})
     Checkpoints = (data.checkpoints and data.checkpoints or {})
     WayPoints = (data.wayPoints and data.wayPoints or {})
     Shrines = (data.shrines and data.shrines or {})

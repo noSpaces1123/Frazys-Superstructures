@@ -65,68 +65,26 @@ function NewTurret(x, y, fireInterval, notOnMap)
         homing = math.random() <= 0.05,
         inaccuracy = math.random(TurretGlobalData.inaccuracy.min, TurretGlobalData.inaccuracy.max),
         warble = { current = 0, max = math.random(TurretGlobalData.warble.min, TurretGlobalData.warble.max) },
+        mood = lume.weightedchoice(TurretGlobalData.moodPalette)
     })
 end
 function UpdateTurrets()
     TurretGlobalData.threatUpdateInterval.current = TurretGlobalData.threatUpdateInterval.current + 1 * GlobalDT
 
     for turretIndex, turret in ipairs(Turrets) do
-        if turret.render then
+        if turret.render or Zen.doingSo then
+
+            if not turret.mood then
+                turret.mood = lume.weightedchoice(TurretGlobalData.moodPalette)
+            end
 
             local distance = Distance(turret.x, turret.y, Player.centerX, Player.centerY)
 
             local before = turret.seesPlayer
             turret.seesPlayer = distance <= turret.viewRadius and not Player.invisible
 
-            if not Player.respawnWait.dead and turret.seesPlayer and not NextLevelAnimation.running and GameState == "game" then
-                if not before and turret.seesPlayer then
-                    PlaySFX(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
-                end
-
-                Player.targeted = true
-
-                turret.discovered = true
-
-                turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
-                turret.objectiveSearchingAngle = turret.searchingAngle
-
-                local angle = AngleBetween(turret.x, turret.y, Player.x, Player.y) + math.rad(math.random(turret.inaccuracy) * (lume.randomchoice({true,false}) and 1 or -1))
-
-                turret.fireRate.current = turret.fireRate.current + 1 * GlobalDT / (distance <= Player.destroyingTurretFireRateRangeDiminishment and 1.5 or 1)
-                if turret.fireRate.current >= turret.fireRate.max then
-                    if turret.type == "normal" then
-                        PlaySFX(SFX.shoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
-                        turret.fireRate.current = 0
-                        FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed, turretIndex)
-                    elseif turret.type == "laser" then
-                        PlaySFX(SFX.jump, .1, .6)
-                        IncreasePlayerTemperature(2.5)
-                        table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*(Player.temperature.current/Player.temperature.max)*4+2, {1,.5,0,math.random()/2+.5}, 1, math.random(360), 0.02, 300))
-                    elseif turret.type == "drag" then
-                        turret.fireRate.current = 0
-                        PlaySFX(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
-                        DragPlayerTowards(turret.x, turret.y, 10)
-                    elseif turret.type == "push" then
-                        if not SFX.push:isPlaying() then PlaySFX(SFX.push, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5) end
-
-                        DragPlayerTowards(turret.x, turret.y, -0.8 * GlobalDT)
-
-                        table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*3+2, {1,0,.7,math.random()/2+.5}, 2, math.random(360), 0, 300,
-                        function (self)
-                            self.degrees = self.degrees + Jitter(60)
-                            if self.speed > 0 then
-                                self.speed = self.speed - 0.02 * GlobalDT
-                                if self.speed <= 0 then
-                                    self.speed = 0
-                                end
-                            end
-                        end))
-                    end
-                end
-            else
+            local updateSearching = function()
                 turret.fireRate.current = 0
-
-                turret.seesPlayer = false
 
                 if Settings.graphics.current >= 2 then
                     local speed = 0.5
@@ -149,6 +107,67 @@ function UpdateTurrets()
                         end
                     end
                 end
+            end
+
+            if not Player.respawnWait.dead and turret.seesPlayer and not NextLevelAnimation.running and GameState == "game" then
+                if not before and turret.seesPlayer then
+                    if turret.mood == "peaceful" then
+                        if math.random() < .6 then    PlaySFX(SFX.heart, .12, math.random()/10+.95)    end
+                        NewMessage("<3", turret.x, turret.y - TurretGlobalData.headRadius - 40, {1,25/255,240/255}, 170, Fonts.medium)
+                    else
+                        PlaySFX(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
+                    end
+                end
+
+                Player.targeted = true
+
+                turret.discovered = true
+
+                turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
+                turret.objectiveSearchingAngle = turret.searchingAngle
+
+                if turret.mood ~= "peaceful" then
+                    local angle = AngleBetween(turret.x, turret.y, Player.x, Player.y) + math.rad(math.random(turret.inaccuracy) * (lume.randomchoice({true,false}) and 1 or -1))
+
+                    turret.fireRate.current = turret.fireRate.current + 1 * GlobalDT / (distance <= Player.destroyingTurretFireRateRangeDiminishment and 1.5 or 1)
+                    if turret.fireRate.current >= turret.fireRate.max then
+                        if turret.type == "normal" then
+                            PlaySFX(SFX.shoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
+                            turret.fireRate.current = 0
+                            FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed, turretIndex)
+                        elseif turret.type == "laser" then
+                            PlaySFX(SFX.jump, .1, .6)
+                            IncreasePlayerTemperature(2.5)
+                            table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*(Player.temperature.current/Player.temperature.max)*4+2, {1,.5,0,math.random()/2+.5}, 1, math.random(360), 0.02, 300))
+                        elseif turret.type == "drag" then
+                            turret.fireRate.current = 0
+                            PlaySFX(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
+                            DragPlayerTowards(turret.x, turret.y, 10)
+                        elseif turret.type == "push" then
+                            if not SFX.push:isPlaying() then PlaySFX(SFX.push, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5) end
+
+                            DragPlayerTowards(turret.x, turret.y, -0.8 * GlobalDT)
+
+                            table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*3+2, {1,0,.7,math.random()/2+.5}, 2, math.random(360), 0, 300,
+                            function (self)
+                                self.degrees = self.degrees + Jitter(60)
+                                if self.speed > 0 then
+                                    self.speed = self.speed - 0.02 * GlobalDT
+                                    if self.speed <= 0 then
+                                        self.speed = 0
+                                    end
+                                end
+                            end))
+                        end
+
+                        if turret.mood == "angry" then
+                            turret.fireRate.max = math.random(TurretGlobalData.fireInterval.min/3, TurretGlobalData.fireInterval.max/4)
+                        end
+                    end
+                end
+            else
+                turret.seesPlayer = false
+                updateSearching()
             end
 
             if TurretGlobalData.threatUpdateInterval.current >= TurretGlobalData.threatUpdateInterval.max then
@@ -216,7 +235,12 @@ function DrawTurrets()
             love.graphics.setLineWidth(3)
         end
 
-        love.graphics.circle("fill", turret.x, turret.y, TurretGlobalData.headRadius * (Minimap.showing and 2 or 1), 100)
+        local x, y = turret.x, turret.y
+        if turret.mood == "angry" then
+            x, y = x + Jitter(5), y + Jitter(5)
+        end
+
+        love.graphics.circle("fill", x, y, TurretGlobalData.headRadius * (Minimap.showing and 2 or 1), 100)
 
         local alpha = .5
         if turret.type == "normal" then
@@ -232,7 +256,7 @@ function DrawTurrets()
 
         if turret.seesPlayer then
             local r, g, b = love.graphics.getColor()
-            love.graphics.setColor(r, g, b, turret.fireRate.current / turret.fireRate.max)
+            love.graphics.setColor(r, g, b, (turret.mood == "peaceful" and alpha or turret.fireRate.current / turret.fireRate.max))
 
             local drawLine = function (amplitude)
                 love.graphics.line(turret.x, turret.y, Player.centerX + Jitter(amplitude), Player.centerY + Jitter(amplitude))
@@ -243,7 +267,7 @@ function DrawTurrets()
                     drawLine(13)
                 end
             else
-                drawLine(3)
+                drawLine((turret.mood == "angry" and 10 or 3))
             end
         else
             local x2 = math.sin(math.rad(turret.searchingAngle)) * turret.viewRadius + turret.x

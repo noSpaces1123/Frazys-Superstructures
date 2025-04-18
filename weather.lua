@@ -73,6 +73,7 @@ function InitialiseWeather()
                 passiveCoolingAdd = function () return -0.26 * Weather.strength end,
                 overlay = {1,.5,0,.3},
                 shaderSinOffset = 0,
+                enemySpeedMultiplier = .7,
                 shader = love.graphics.newShader([[
 
 extern vec2 screenDimensions;

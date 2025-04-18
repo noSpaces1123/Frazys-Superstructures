@@ -65,6 +65,7 @@ function love.load()
         superJumpFull = love.audio.newSource("assets/sfx/super jump full.wav", "static"),
         poof = love.audio.newSource("assets/sfx/poof.wav", "static"),
         changeWeather = love.audio.newSource("assets/sfx/change weather.wav", "static"),
+        heart = love.audio.newSource("assets/sfx/heart.wav", "static"),
         checkpointFizzleOut = {
             love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
             love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
@@ -216,6 +217,12 @@ function love.load()
         headRadius = 20,
         readingsDistance = 25,
         threatWidth = 120, threatHeight = 120, threatUpdateInterval = { current = 0, max = 10 },
+
+        moodPalette = {
+            ["normal"] = 25,
+            ["angry"] = 1,
+            ["peaceful"] = 1,
+        },
     }
 
     EnemyGlobalData = {
@@ -487,7 +494,7 @@ function love.load()
                         for key, _ in pairs(Weather.types) do
                             if key ~= Weather.currentType then table.insert(choices, key) end
                         end
-                        Weather.currentType = lume.randomchoice(choices)
+                        Weather.currentType = choices[math.random(#choices)]
 
                         PlaySFX(SFX.changeWeather, .4, 1)
                         SFX.windy:stop()
@@ -505,6 +512,52 @@ function love.load()
                         elseif Settings.musicOn then
                             Music:play()
                         end
+                    end
+                end
+            },
+            ["Globu"] = {
+                width = 20, height = 10, color = { 125/255, 245/255, 221/255 },
+                wait = { current = 300, max = 300 },
+                voiceLines = {
+                    greeting = {
+                        "Globu is I. Wish to find a thing?",
+                        "Globu. I know a thing. Want to see?",
+                        "I am Globu. Want to find a thing?",
+                    },
+                },
+                event = function (self, bub, bubIndex, event)
+                    if event == "find a thing" then
+                        bub.disabled = true
+                        for _ = 1, 40 do
+                            table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {self.color[1],self.color[2],self.color[3],math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
+                        end
+                        PlaySFX(SFX.poof, .4, .5)
+                        Player.bubEngagementIndex = nil
+                        bub.says = nil
+
+
+                        local pickFrom = { {}, {} }
+                        for i, t in ipairs(pickFrom) do
+                            if i == 1 then
+                                for _, shrine in ipairs(Shrines) do
+                                    table.insert(t, shrine)
+                                end
+                            elseif i == 2 then
+                                for _, bub2 in ipairs(Bubs) do
+                                    if not bub2.disabled then
+                                        table.insert(t, bub2)
+                                    end
+                                end
+                            end
+                        end
+                        for _, t in ipairs(pickFrom) do    if #t == 0 then lume.remove(pickFrom, t) end    end
+
+                        local tablePick = pickFrom[math.random(#pickFrom)]
+                        local pick = tablePick[math.random(#tablePick)]
+
+                        local inaccuracy = 1.5
+
+                        NewWayPoint(pick.x + Jitter(ToPixels(inaccuracy)), pick.y + Jitter(ToPixels(inaccuracy)))
                     end
                 end
             },
@@ -693,6 +746,12 @@ function love.load()
 
     MenuAnimation = { x = 0, overlay = 0, objectIntro = 0 }
 
+    Zen = {
+        doingSo = false,
+        camera = { x = 0, y = 0, speed = 30 },
+        zoom = .3,
+    }
+
     CommandLine = {
         typing = false,
         text = "",
@@ -737,7 +796,7 @@ function love.update(dt)
                 UpdateNextLevelAnimation()
 
                 if not Paused then
-                    if not Player.respawnWait.dead then TimeOnThisLevel = TimeOnThisLevel + dt end
+                    if not Player.respawnWait.dead and not Zen.doingSo then TimeOnThisLevel = TimeOnThisLevel + dt end
 
                     GetThreadData()
 
@@ -934,8 +993,6 @@ function DrawGameFrame()
     DrawTurrets()
     DrawBullets()
 
-    DrawPlayerAlignmentAxes()
-
     love.graphics.setColor(1,1,1)
     if Level == 1 and PlayerCanMove then
         love.graphics.draw(Sprites.controls, -Sprites.controls:getWidth() / 2, Boundary.y + Boundary.height - 300)
@@ -960,7 +1017,6 @@ function DrawGameFrame()
         DisplayBlackjackHand("dealer")
     end
 
-    DrawCursorReadings()
     DrawDialogue()
 end
 
@@ -1741,8 +1797,7 @@ function UpdateCamLookAhead()
     end
 end
 function ApplyCamLookAhead()
-    local multiply = 1 + EaseInOutCubic(Clamp((Player.timeStill - 60) / Player.timeStillFocusDivisor, 0, 1)) * 1.5
-    love.graphics.translate(CamLookAhead.xOff * multiply, CamLookAhead.yOff * multiply)
+    love.graphics.translate(CamLookAhead.xOff, CamLookAhead.yOff)
 end
 
 function EaseOutQuint(x)
@@ -1926,6 +1981,8 @@ function AngleBetween(x1, y1, x2, y2)
 end
 
 function UpdateSaveInterval()
+    if Zen.doingSo then return end
+
     SaveInterval.current = SaveInterval.current + 1 * GlobalDT
     if SaveInterval.current >= SaveInterval.max then
         SaveInterval.current = 0
@@ -2003,20 +2060,22 @@ function CheckForOddities()
 end
 
 function InitialiseRegularCoordinateAlterations()
-    local zoom = CalculateZoom()
-    local lookAheadX, lookAheadY = ConvertPlayerVelocityToCameraLookAhead()
-    love.graphics.scale(zoom)
-    love.graphics.translate(love.graphics.getWidth() / zoom / 2 + lookAheadX, love.graphics.getHeight() / zoom / 2 + lookAheadY)
+    if Zen.doingSo then
+        love.graphics.scale(Zen.zoom)
+        love.graphics.translate(love.graphics.getWidth() / Zen.zoom / 2, love.graphics.getHeight() / Zen.zoom / 2)
+        love.graphics.translate(-Zen.camera.x, -Zen.camera.y)
+    else
+        local zoom = CalculateZoom()
+        local lookAheadX, lookAheadY = ConvertPlayerVelocityToCameraLookAhead()
+        love.graphics.scale(zoom)
+        love.graphics.translate(love.graphics.getWidth() / zoom / 2 + lookAheadX, love.graphics.getHeight() / zoom / 2 + lookAheadY)
 
-    love.graphics.rotate(ConvertPlayerVelocityToCameraRotation())
+        love.graphics.rotate(ConvertPlayerVelocityToCameraRotation())
 
-    if not NextLevelAnimation.running then
-        love.graphics.translate(-Player.x - Player.width / 2, -Player.y - Player.height / 2)
+        if not NextLevelAnimation.running then
+            love.graphics.translate(-Player.x - Player.width / 2, -Player.y - Player.height / 2)
+        end
     end
-
-    --[[if Paused then
-        love.graphics.translate(math.random()-math.random(), 0)
-    end]]
 end
 
 function DrawPausedOverlay()
@@ -2070,21 +2129,29 @@ function InitialiseMenuButtons()
     NewButton("Begin", x, CENTERY + 100, width, 80, "left", {1,1,1}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.big, 2, 10,10, function (self)
         GameState = "game"
         MenuAnimation.overlay = 1
+        TurnOffZen()
         LoadData()
     end, nil, function (self)
         return GameState == "menu"
     end)
-    NewButton("Settings", x, CENTERY + 200, width, 60, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 0, 10,10, function (self)
+    NewButton("Zen", x, CENTERY + 200, width, 40, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 2, 10,10, function (self)
+        GameState = "game"
+        MenuAnimation.overlay = 1
+        StartZen()
+    end, nil, function (self)
+        return GameState == "menu"
+    end)
+    NewButton("Settings", x, CENTERY + 250, width, 60, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 0, 10,10, function (self)
         GameState = "settings"
     end, nil, function (self)
         return GameState == "menu"
     end)
-    NewButton("Changelog", x, CENTERY + 270, width, 40, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 0, 10,10, function (self)
+    NewButton("Changelog", x, CENTERY + 320, width, 40, "left", {.4,.4,.4}, {0,0,0}, {.1,.1,.1}, {1,1,1}, Fonts.medium, 0, 10,10, function (self)
         GameState = "changelog"
     end, nil, function (self)
         return GameState == "menu"
     end)
-    NewButton("Remove me", x, CENTERY + 320, width, 40, "left", {.3,0,0}, {.1,0,0}, {.1,0,0}, {1,0,0}, Fonts.medium, 0, 10,10, function (self)
+    NewButton("Quit", x, CENTERY + 370, width, 40, "left", {.3,0,0}, {.1,0,0}, {.1,0,0}, {1,0,0}, Fonts.medium, 0, 10,10, function (self)
         love.event.quit()
     end, nil, function (self)
         return GameState == "menu"
@@ -2279,6 +2346,7 @@ function InitialiseUpgrades()
                 "misc display",
                 "minimap",
                 "signal radar",
+                "signal radar ii",
             }
         },
     }
@@ -2493,4 +2561,24 @@ function SendThreadData()
 
     love.thread.getChannel("enemies to thread"):push(Enemies)
     love.thread.getChannel("player"):push(Player)
+end
+
+function StartZen()
+    Zen.doingSo = true
+    GenerateObjects()
+    Zen.camera.x = Boundary.x + Boundary.width / 2 - love.graphics.getWidth() / 2
+    Zen.camera.y = Boundary.y + Boundary.height / 2 - love.graphics.getHeight() / 2
+    Player.invisible = true
+    Player.draw = false
+    Minimap.showing = false
+    Music:pause()
+end
+function TurnOffZen()
+    Zen.doingSo = false
+    Player.invisible = false
+    Player.draw = true
+
+    if Settings.musicOn then
+        Music:play()
+    end
 end

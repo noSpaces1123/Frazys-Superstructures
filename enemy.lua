@@ -39,20 +39,20 @@ end
 
 function NewEnemy(x, y)
     local m = (Weather.currentType == "foggy" and Weather.types.foggy.enemySizeMultiplier or 1)
-    local sm = (Weather.currentType == "foggy" and Weather.types.foggy.enemySpeedMultiplier or 1)
 
     table.insert(Enemies, {
         x = x, y = y, xvelocity = 0, yvelocity = 0,
-        width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max) * m, speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide * sm,
+        width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max) * m, speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide,
         viewRadius = math.random(EnemyGlobalData.viewRadius.min, EnemyGlobalData.viewRadius.max), seesPlayer = false,
         warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) },
         rotationRadians = math.rad(math.random(360)), rotationVelocity = 0,
+        fearful = math.random() < 1/5
     })
 end
 
 function DrawEnemies()
     for _, enemy in ipairs(Enemies) do
-        if not enemy.dead and enemy.discovered and ((not Minimap.showing and Distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) then
+        if not enemy.dead and (enemy.discovered and ((not Minimap.showing and Distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) or Zen.doingSo) then
             if not enemy.shortCircuit then enemy.shortCircuit = { current = 0, max = 0, running = false } end
 
             local fillColor = { 1, (1 - enemy.speed / (EnemyGlobalData.speed.max / EnemyGlobalData.speed.divide)) * .3 ,0 }
@@ -123,10 +123,15 @@ end
 
 function UpdateEnemies()
     for index, enemy in ipairs(Enemies) do
-        if enemy.render and not enemy.dead then
+        if (enemy.render or Zen.doingSo) and not enemy.dead then
             if not enemy.shortCircuit then enemy.shortCircuit = { current = 0, max = 0, running = false } end
 
-            local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+            local distance
+            if Zen.doingSo then
+                distance = Distance(Zen.camera.x, Zen.camera.y, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+            else
+                distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+            end
 
             local before = enemy.seesPlayer
             enemy.seesPlayer = distance <= enemy.viewRadius and not Player.invisible
@@ -138,7 +143,9 @@ function UpdateEnemies()
                 end
             end
 
-            if enemy.render then
+            if enemy.render or Zen.doingSo then
+                local enemyNetSpeed = Pythag(enemy.xvelocity, enemy.yvelocity)
+
                 enemy.xvelocity = ApplyWind(enemy.xvelocity)
 
                 if not Player.respawnWait.dead and not NextLevelAnimation.running and not enemy.shortCircuit.running then
@@ -148,16 +155,24 @@ function UpdateEnemies()
                         enemy.discovered = true
 
                         local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(Jitter(20))
-                        enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * GlobalDT
-                        enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * GlobalDT
+
+                        if enemy.fearful and Player.netSpeed - 10 > enemyNetSpeed then
+                            angle = angle + math.rad(180)
+                        end
+
+                        local multiply = (Weather.types[Weather.currentType].enemySpeedMultiplier and Weather.types[Weather.currentType].enemySpeedMultiplier or 1)
+
+                        enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * multiply * GlobalDT
+                        enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * multiply * GlobalDT
                     end
                 end
 
                 DoEnemyFriction(index)
-                DoEnemyCollisions(index)
 
                 enemy.x = enemy.x + enemy.xvelocity * GlobalDT
                 enemy.y = enemy.y + enemy.yvelocity * GlobalDT
+
+                DoEnemyCollisions(index)
 
                 enemy.rotationRadians = enemy.rotationRadians + enemy.rotationVelocity * GlobalDT
                 if enemy.rotationRadians > 360 then
@@ -168,7 +183,7 @@ function UpdateEnemies()
 
                 if not Player.respawnWait.dead and not NextLevelAnimation.running then
                     if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
-                        if Player.netSpeed / (Weather.currentType == "foggy" and 4 or 1) + Player.enemyKillForgiveness >= Pythag(enemy.xvelocity, enemy.yvelocity) then
+                        if Player.netSpeed / (Weather.currentType == "foggy" and 4 or 1) + Player.enemyKillForgiveness >= enemyNetSpeed then
                             ExplodeEnemy(enemy)
                             PlayDialogue(math.random(#Dialogue.eventual.killEnemy), "killEnemy")
                             PlayerSkill.enemiesKilled = PlayerSkill.enemiesKilled + 1
@@ -186,7 +201,7 @@ function UpdateEnemies()
                 end
 
                 -- warbling
-                local maxWarbleHearing = 2000
+                local maxWarbleHearing = (Zen.doingSo and ToPixels(30) or ToPixels(10))
                 if enemy.warble == nil then enemy.warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) } end
                 enemy.warble.current = enemy.warble.current + 1
                 if enemy.warble.current >= enemy.warble.max then

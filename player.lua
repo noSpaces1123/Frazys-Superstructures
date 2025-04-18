@@ -16,7 +16,6 @@ function LoadPlayer()
         temperature = { current = 0, max = 500 }, passiveCooling = .4,
         superJump = { increase = 1, current = 0, max = 1500, cost = 900, replenished = false, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
         checkpoint = { x = nil, y = nil },
-        timeStill = 0, timeStillFocusDivisor = 200,
         renderDistance = ToPixels(10),
         wallPush = false,
         instinctOfTheBulletJumperDistance = 700,
@@ -87,36 +86,37 @@ function ResetGame()
 end
 
 function UpdatePlayer()
-    Player.netSpeed = Pythag(Player.xvelocity, Player.yvelocity)
-
     DoPlayerKeyPresses()
     UpdateKeyBuffer()
 
-    if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running and not CommandLine.typing then
-        Player.yvelocity = ApplyGravity(Player)
-        Player.xvelocity = ApplyWind(Player.xvelocity)
+    if not Zen.doingSo then
+        Player.netSpeed = Pythag(Player.xvelocity, Player.yvelocity)
 
-        UpdatePlayerCoyote()
-        DoPlayerSpeedParticles()
-        DoObjectEffects()
-        DoPlayerMovement()
-        UpdateBlips()
-        DoPlayerFriction()
-        CheckIfPlayerHasCompletedLevel()
-        UpdatePlayerTemperature()
-        CheckCollisionWithBullets()
-        CheckCollisionWithWayPoint()
-        DoPlayerGoalMagentismParticles()
-        UpdatePlayerSuperJumpBar()
-        UpdatePlayerTimeStill()
-        CalculatePlayerGreatestBulletPresence()
+        if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running and not CommandLine.typing then
+            Player.yvelocity = ApplyGravity(Player)
+            Player.xvelocity = ApplyWind(Player.xvelocity)
 
-        GuardianAngelGlide()
+            UpdatePlayerCoyote()
+            DoPlayerSpeedParticles()
+            DoObjectEffects()
+            DoPlayerMovement()
+            UpdateBlips()
+            DoPlayerFriction()
+            CheckIfPlayerHasCompletedLevel()
+            UpdatePlayerTemperature()
+            CheckCollisionWithBullets()
+            CheckCollisionWithWayPoint()
+            DoPlayerGoalMagentismParticles()
+            UpdatePlayerSuperJumpBar()
+            CalculatePlayerGreatestBulletPresence()
+
+            GuardianAngelGlide()
+        end
+
+        UpdatePlayerRespawnWait()
+
+        UpdateEffectsOfPlayerSelfDestruct()
     end
-
-    UpdatePlayerRespawnWait()
-
-    UpdateEffectsOfPlayerSelfDestruct()
 end
 
 function love.keypressed(key)
@@ -152,7 +152,7 @@ function UpdateKeyBuffer()
         local key = tuple.key
         local did = true
 
-        if key == "space" and not Paused and PlayerCanMove and (Player.standingOnObject or Player.coyote.running or Player.touchingBottomOfObject or (PlayerPerks["Power of the Achiever"] and not Player.doubleJumpUsed)) then -- jumping
+        if key == "space" and not Zen.doingSo and not Paused and PlayerCanMove and (Player.standingOnObject or Player.coyote.running or Player.touchingBottomOfObject or (PlayerPerks["Power of the Achiever"] and not Player.doubleJumpUsed)) then -- jumping
             if Player.touchingBottomOfObject then
                 Player.yvelocity = Player.yvelocity + Player.jumpStrength
             else
@@ -179,12 +179,12 @@ function UpdateKeyBuffer()
             end]]
 
             Player.jumped = true
-        elseif key == "/" then
+        elseif key == "/" and not Zen.doingSo then
             --PlaySFX(SFX.jump, 0.5, 1)
             SaveData()
-        elseif key == "q" and not Paused and GameState == "game" then
+        elseif key == "q" and not Paused and GameState == "game" and not Zen.doingSo then
             DoPlayerSuperJump()
-        elseif key == "m" and GameState == "game" and AnalyticsUpgrades["minimap"] then
+        elseif key == "m" and GameState == "game" and AnalyticsUpgrades["minimap"] and not Zen.doingSo then
             ToggleMinimap()
         elseif key == "p" and not Minimap.showing and GameState == "game" then
             if Paused then
@@ -251,7 +251,10 @@ function love.mousereleased()
 end
 
 function love.wheelmoved(_, y)
-    if Minimap.showing then
+    if GameState == "changelog" then
+        local textHeight = love.graphics.newText(Fonts.changelog, Changelog):getHeight() - love.graphics.getHeight() + 90
+        ChangelogYOffset = Clamp(ChangelogYOffset + y * 10, -textHeight, 0)
+    elseif Minimap.showing then
         local sound = function ()
             PlaySFX(SFX.zoom, 0.03, 1 - Minimap.zoom + 1)
         end
@@ -266,9 +269,8 @@ function love.wheelmoved(_, y)
         end
 
         Minimap.zoom = Clamp(Minimap.zoom, 0.05, 0.15)
-    elseif GameState == "changelog" then
-        local textHeight = love.graphics.newText(Fonts.changelog, Changelog):getHeight() - love.graphics.getHeight() + 90
-        ChangelogYOffset = Clamp(ChangelogYOffset + y * 10, -textHeight, 0)
+    elseif Zen.doingSo then
+        Zen.zoom = Clamp(Zen.zoom + 0.007 * y, 0.05, 0.4)
     end
 end
 
@@ -283,7 +285,7 @@ function love.quit()
 end
 
 function DrawPlayer()
-    if Player.respawnWait.dead or NextLevelAnimation.running or not Player.draw then return end
+    if Player.respawnWait.dead or NextLevelAnimation.running or not Player.draw or Zen.doingSo then return end
 
     --[[
     love.graphics.setColor(Player.color[1], Player.color[2], Player.color[3], .3)
@@ -346,6 +348,19 @@ function DoPlayerKeyPresses()
         end
         if love.keyboard.isDown("d") then
             Minimap.x = Minimap.x + Minimap.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
+        end
+    elseif Zen.doingSo then
+        if love.keyboard.isDown("w") then
+            Zen.camera.y = Zen.camera.y - Zen.camera.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
+        end
+        if love.keyboard.isDown("a") then
+            Zen.camera.x = Zen.camera.x - Zen.camera.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
+        end
+        if love.keyboard.isDown("s") then
+            Zen.camera.y = Zen.camera.y + Zen.camera.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
+        end
+        if love.keyboard.isDown("d") then
+            Zen.camera.x = Zen.camera.x + Zen.camera.speed * GlobalDT * (love.keyboard.isDown("lshift") and 2 or 1)
         end
     elseif not Player.respawnWait.dead and not Paused and not Descending.hooligmanCutscene.running then
         if not Player.touchingStickyObject and PlayerCanMove then
@@ -957,29 +972,6 @@ function SetCheckpoint(checkpoint)
     PlaySFX(SFX.checkpoint, .7, math.random() + .9)
 end
 
-function UpdatePlayerTimeStill()
-    if 0 <= Player.xvelocity + Player.yvelocity and Player.xvelocity + Player.yvelocity < 0.1 then
-        Player.timeStill = Player.timeStill + 1 * GlobalDT
-        if Player.timeStill > 1 then
-            Player.timeStill = 1
-        end
-    else
-        Player.timeStill = Player.timeStill - 20 * GlobalDT
-        if Player.timeStill < 0 then
-            Player.timeStill = 0
-        end
-    end
-end
-function DrawPlayerAlignmentAxes()
-    local minimum = 300
-    love.graphics.setColor(0,1,0, Player.timeStill / minimum / 2)
-    love.graphics.setLineWidth(2)
-
-    local length = 2000
-    love.graphics.line(Player.x - length, Player.centerY, Player.x + length, Player.centerY)
-    love.graphics.line(Player.centerX, Player.y - length, Player.centerX, Player.y + length)
-end
-
 function CalculatePlayerSkill()
     local skill = PlayerSkill.turretsDestroyed/7 + PlayerSkill.enemiesKilled / 2 + (Level-1)^1.5/5 - PlayerSkill.deaths/3 + PlayerSkill.greatestBulletPresence / 3
 
@@ -1007,28 +999,6 @@ function CalculatePlayerGreatestBulletPresence()
     if count > PlayerSkill.greatestBulletPresence then
         PlayerSkill.greatestBulletPresence = count
         SaveData()
-    end
-end
-
-function DrawCursorReadings()
-    if love.mouse.isDown(1) then
-        local mx, my = love.graphics.inverseTransformPoint(love.mouse.getX(), love.mouse.getY())
-        local spacing = 30
-
-        local jumpHeight = CalculatePlayerJumpHeight()
-        local canReach = Player.y - jumpHeight <= my
-
-        love.graphics.setColor(0,1,0)
-        love.graphics.setFont(Fonts.medium)
-        love.graphics.print(
-            math.floor(ToMeters(my)*10)/10 .. " m / " .. ToMeters(Boundary.height) .. " m" ..
-            "\ncan reach: " .. tostring(canReach)
-        , mx + spacing, my + spacing)
-
-        local length = 300
-        local y = Player.y - jumpHeight
-        love.graphics.setLineWidth(2)
-        love.graphics.line(mx - length / 2, y, mx + length / 2, y)
     end
 end
 
@@ -1129,7 +1099,7 @@ function DrawWayPointArrow()
     DrawArrowTowards(closest.x, closest.y, closest.color, 1, ToPixels(50))
 end
 
-function DrawArrowTowards(x, y, color, size, maxDistance)
+function DrawArrowTowards(x, y, color, size, maxDistance, waypoint)
     local distance = Distance(Player.centerX, Player.centerY, x, y)
     local ratio = Clamp(1 - distance / maxDistance, 0.1, 1)
     local angle = AngleBetween(Player.centerX, Player.centerY, x, y)
@@ -1138,7 +1108,13 @@ function DrawArrowTowards(x, y, color, size, maxDistance)
         Player.x + math.sin(angle) * 100,               Player.y + math.cos(angle) * 100,
         Player.x + math.sin(angle + math.rad(20 * size * ratio)) * 80, Player.y + math.cos(angle + math.rad(20 * size * ratio)) * 80,
     }
-    love.graphics.setColor(color)
+
+    if AnalyticsUpgrades["signal radar ii"] or waypoint then
+        love.graphics.setColor(color)
+    else
+        love.graphics.setColor(.7,.7,.7,1)
+    end
+
     love.graphics.setLineWidth(2)
     love.graphics.line(points)
 
