@@ -1,4 +1,4 @@
-Version = "1.6.2"
+Version = "1.6.3"
 
 ChangelogYOffset = 0
 
@@ -7,63 +7,55 @@ Changelog = Version ..
 [[
  Changelog:
 
-    Weather:
-    - Change: Adjusted weather chances (clear 42%, rainy 32%, hot 21%, foggy 5%)
-    - Removed: Higher zoom in foggy levels
-    - New: Added menu option to turn off weather screen darkening (to increase visibility in rainy levels)
-    - New: Weather is guaranteed clear until level 10
+    Turrets:
+    - New: Bullet sprites
 
+    OTHER:
+    - New: Added voice acting for the player
+    - Change: Windows render distance increased from 10 to 14 meters
+    - Fixed: Foggy level shader overlay incorrectly centered on Windows
+    
+1.6 -> 1.6.2 Changelog:
+    
+    UI:
+    - UI changes
+    
+    Camera:
+    - New: Camera rotation based on velocity (togglable in settings)
+    
     Platforms:
+    - New: Added random color darkening for variation
     - New: Sticky platform stickiness can be negated by holding space
     - New: Random platform scale factor for each level (correlating to platform density)
     - New: Background beams between platforms for the sake of graphical depth (no gameplay effects)
-
+    
     Turrets:
-    - Change: Decreased velocity multiplier when destroying turrets
-    - New: 7% of turrets will be have personality trait peaceful or angry
-
-    Hooligans:
-    - New: 1 in 5 hooligans will run away if you're moving significantly faster than them
-
-    Bubs:
-    - New: Added Marvin the Magic Weatherman, Wygore the Wise, and Globu the Navigator
-
-    OTHER:
-    - New: Quit button in the menu
-    - New: Zen mode
-    - Change: Decreased input buffer time from 0.17 seconds to 0.08 seconds
-    - Removed: Cursor readings (hovering over turrets to see data)
-
-
-
-1.6 -> 1.6.1 Changelog:
-
-    UI:
-    - UI changes
-
-    Camera:
-    - New: Camera rotation based on velocity (togglable in settings)
-
-    Platforms:
-    - New: Added random color darkening for variation
-
-    Turrets:
-    - Removed: Bouncing off turrets when destroying them
     - New: Velocity multiplier when destroying turrets
     - New: Screen shake when destroying turrets
-
+    - New: 7% of turrets will be have personality trait peaceful or angry
+    - Change: Decreased velocity multiplier when destroying turrets
+    - Removed: Bouncing off turrets when destroying them
+    
     Weather:
     - New: Wind whooshing sound for hot levels
     - New: Foggy weather
+    - New: Added menu option to turn off weather screen darkening (to increase visibility in rainy levels)
+    - New: Weather is guaranteed clear until level 10
     - Change: Hot weather chance when starting a new level decreased from 33% to 25%
     - Change: Decreased wind event strength
+    - Change: Adjusted weather chances (clear 42%, rainy 32%, hot 21%, foggy 5%)
+    - Removed: Higher zoom in foggy levels
     - Fixed: Rainy level rain effect being at random line widths
     - Fixed: Rainy level rain sounds looping awkwardly
     - Fixed: Added continuity with wind events across game instances
-
+    
     Bubs:
+    - New: Added Marvin the Magic Weatherman, Wygore the Wise, and Globu the Navigator
     - Change: Decreased Bub detection radius from 75 to 30 meters
 
+    Hooligans:
+    - New: 1 in 5 hooligans will run away if you're moving significantly faster than them
+    
     Super jump:
     - New: Added SFX to communicate when a super jump can be used and when your bar is at max
 
@@ -73,7 +65,11 @@ Changelog = Version ..
     - Fixed: Mass of turrets spawning on level 50
 
     OTHER:
+    - New: Quit button in the menu
+    - New: Zen mode
     - Change: Changed game icon to resemble a hooligan
+    - Change: Decreased input buffer time from 0.17 seconds to 0.08 seconds
+    - Removed: Cursor readings (hovering over turrets to see data)
 
 
 1.5 Changelog:

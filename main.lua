@@ -89,6 +89,8 @@ function love.load()
     }
 
     love.audio.setEffect("reverb", { type = "reverb", decaytime = 2 })
+    love.audio.setEffect("player voice", { type = "equalizer", lowgain = 0.127, lowcut = 1000 })
+
     SFX.superJumpFull:setEffect("reverb")
     SFX.superJumpReplenish:setEffect("reverb")
     SFX.superJump:setEffect("reverb")
@@ -107,6 +109,7 @@ function love.load()
         controls = love.graphics.newImage("assets/sprites/controls.png", {dpiscale=8}),
         fullControls = love.graphics.newImage("assets/sprites/full controls.png", {dpiscale=7}),
         jacksHat = love.graphics.newImage("assets/sprites/jack's hat.png", {dpiscale=13}),
+        bullet = love.graphics.newImage("assets/sprites/bullet.png", {dpiscale=11}),
         posters = {}
     }
     for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/posters")) do
@@ -872,8 +875,8 @@ function love.draw()
                 elseif Weather.currentType == "foggy" then
                     --Weather.types[Weather.currentType].shader:send("screenDimensions", {love.graphics.getWidth(), love.graphics.getHeight()})
                     Weather.types[Weather.currentType].shader:send("screenCenter", {
-                        love.graphics.getWidth(),
-                        love.graphics.getHeight(),
+                        love.graphics.getWidth() / (love.system.getOS() ~= "OS X" and 2 or 1),
+                        love.graphics.getHeight() / (love.system.getOS() ~= "OS X" and 2 or 1),
                     })
                     Weather.types[Weather.currentType].shader:send("maxLightDistance", 1300)
                 end

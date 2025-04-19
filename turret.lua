@@ -350,8 +350,13 @@ function FireBullet(x, y, angle, speed, originTurretIndex)
     table.insert(Bullets, {
         x = x, y = y, radius = TurretGlobalData.bulletRadius, warningProgression = 0, angle = angle,
         draw = function (self)
-            love.graphics.setColor(1,0,0)
-            love.graphics.circle("fill", self.x, self.y, self.radius)
+            love.graphics.setColor(1,1,1)
+
+            love.graphics.push()
+            love.graphics.translate(self.x, self.y)
+            love.graphics.rotate(-angle + math.rad(180))
+            love.graphics.draw(Sprites.bullet, -Sprites.bullet:getWidth()/2, -Sprites.bullet:getHeight()/2)
+            love.graphics.pop()
 
             local maxdistance, checks = 1300, 20
             for i = 0, maxdistance, maxdistance / checks do
@@ -369,6 +374,7 @@ function FireBullet(x, y, angle, speed, originTurretIndex)
                 end
             end
 
+            love.graphics.setColor(1,0,0)
             love.graphics.setLineWidth(3)
             love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression), 100)
         end,

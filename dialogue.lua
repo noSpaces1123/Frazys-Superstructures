@@ -85,7 +85,7 @@ Dialogue = {
             end
         },
         {
-            text = "Those yellow turrets pull me in, but don't do any damage.",
+            text = "Those yellow turrets pull me in, but don't deal any damage.",
             when = function ()
                 local yes = false
                 for _, turret in ipairs(Enemies) do
@@ -109,7 +109,7 @@ Dialogue = {
             end
         },
         {
-            text = "Intel said I've got a special ability I can use with [Q], as long as I have enough charge in the top left bar. A fixed amount is removed from the bar with every use.",
+            text = "Intel said I've got a special ability I can use with [Q], as long as I have enough charge in the top right bar. A fixed amount is removed from the bar with every use.",
             when = function ()
                 return Level == 5
             end
@@ -178,7 +178,7 @@ Dialogue = {
             end
         },
         {
-            text = "These levels don't seem to be too complex, but I have a feeling more and more turrets are piling up...",
+            text = "These levels don't seem to be too complex, but I have a feeling more and more turrets are piling up...", -- LAST ONE TO DO MR SKIPPER
             when = function ()
                 return Level >= 12
             end
@@ -318,7 +318,7 @@ Dialogue = {
             end
         },
         {
-            text = "I think I can kill those red hooligans by hitting them with more speed than when they hit me.",
+            text = "I think I can kill those red hooligans by hitting them with more speed than they hit me.",
             when = function ()
                 return Level >= 4
             end
@@ -427,6 +427,13 @@ Dialogue = {
     },
 }
 
+-- load the voicelines for each dialogue thing
+for index, line in ipairs(Dialogue.list) do
+    if love.filesystem.getInfo("assets/voicelines/" .. index .. ".mp3") then
+        line.voice = love.audio.newSource("assets/voicelines/" .. index .. ".mp3", "static")
+    end
+end
+
 
 
 function UpdateDialogue()
@@ -484,6 +491,11 @@ function PlayDialogue(index, event)
     Dialogue.playing.postWait.current = 0
     Dialogue.playing.playedFinishFunc = false
     if not event then Dialogue.playing.finishFunc = Dialogue.list[index].finishFunc end
+
+    if Dialogue.list[index].voice then
+        Dialogue.list[index].voice:setEffect("player voice")
+        PlaySFX(Dialogue.list[index].voice, .6, 1)
+    end
 end
 function DrawDialogue()
     if not Dialogue.playing.running then return end

@@ -16,7 +16,7 @@ function LoadPlayer()
         temperature = { current = 0, max = 500 }, passiveCooling = .4,
         superJump = { increase = 1, current = 0, max = 1500, cost = 900, replenished = false, reward = { explodingTurret = 300, onIce = 1 } }, superJumpStrength = 80,
         checkpoint = { x = nil, y = nil },
-        renderDistance = ToPixels(10),
+        renderDistance = ToPixels((love.system.getOS() == "Windows" and 14 or 10)),
         wallPush = false,
         instinctOfTheBulletJumperDistance = 700,
         doubleJumpUsed = false,
