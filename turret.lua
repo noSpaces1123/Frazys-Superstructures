@@ -1,3 +1,25 @@
+TurretGlobalData = {
+    height = 50,
+    bulletRadius = 5,
+    bulletSpeed = 7,
+    fireInterval = { min = 36, max = 100 },
+    viewRadius = { min = 800, max = 1300 },
+    inaccuracy = { min = 0, max = 10 },
+    warble = { min = 1000, max = 4000 },
+    dragTurretCoolInterval = 600,
+    headRadius = 20,
+    readingsDistance = 25,
+    threatWidth = 120, threatHeight = 120, threatUpdateInterval = { current = 0, max = 10 },
+
+    moodPalette = {
+        ["normal"] = 25,
+        ["angry"] = 1,
+        ["peaceful"] = 1,
+    },
+}
+
+
+
 function StartTurretUpdateThread()
     TurretUpdateThread = love.thread.newThread([[
 

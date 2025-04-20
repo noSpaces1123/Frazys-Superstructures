@@ -1,3 +1,28 @@
+EnemyGlobalData = {
+    enemyDensity = 0, baseEnemyDensity = 0.00000001,
+    width = { min = 15, max = 30 },
+    speed = { min = 3, max = 8, divide = 10 },
+    viewRadius = { min = 800, max = 1000 },
+    bounceReverberation = 0.4,
+    airFriction = 0.05, rotationFriction = 0.001,
+    minSpeedAgainstWallToDie = 32,
+    warble = { min = 1000, max = 4000 },
+    shortCircuitTime = { min = 60, max = 120 },
+    voiceLines = {
+        "*(#(!(",
+        "!@*)(#*)#(!",
+        "!&*@&&&*@",
+        "#&&!#&#@(!)",
+        "!@)(*@*()((@!&@%^",
+        ")@()@*!",
+        "!@)*@*@",
+        "&%&$*()!&#&#@(",
+        ")!(!@*^#%^*(@&^#&&@",
+    },
+}
+
+
+
 function StartEnemyUpdateThread()
     EnemyUpdateThread = love.thread.newThread([[
 

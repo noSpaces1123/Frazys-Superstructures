@@ -404,6 +404,12 @@ Dialogue = {
                 IntelCallIn("it is quite intriguing!")
             end
         },
+        {
+            text = "This is spooky. Let's get out of here...",
+            when = function ()
+                return Weather.currentType == "foggy"
+            end
+        },
     },
     eventual = {
         killEnemy = {
@@ -437,12 +443,7 @@ end
 
 
 function UpdateDialogue()
-    for index, dialogue in ipairs(Dialogue.list) do
-        if dialogue.when() and not dialogue.done then
-            PlayDialogue(index)
-            dialogue.done = true
-        end
-    end
+    if NextLevelAnimation.running then return end
 
     if Dialogue.playing.running then
         if Dialogue.playing.finished then
@@ -478,6 +479,14 @@ function UpdateDialogue()
                 PlaySFX(SFX.dialogue, 0.6, math.random()/2+.7)
             end
         end
+    else
+        -- search for new dialogue to play
+        for index, dialogue in ipairs(Dialogue.list) do
+            if dialogue.when() and not dialogue.done then
+                PlayDialogue(index)
+                dialogue.done = true
+            end
+        end
     end
 end
 function PlayDialogue(index, event)
@@ -492,7 +501,7 @@ function PlayDialogue(index, event)
     Dialogue.playing.playedFinishFunc = false
     if not event then Dialogue.playing.finishFunc = Dialogue.list[index].finishFunc end
 
-    if Dialogue.list[index].voice then
+    if Dialogue.list[index].voice and not event then
         Dialogue.list[index].voice:setEffect("player voice")
         PlaySFX(Dialogue.list[index].voice, .6, 1)
     end

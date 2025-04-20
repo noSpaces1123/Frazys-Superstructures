@@ -1,3 +1,272 @@
+BubGlobalData = {
+    noticeDistance = ToPixels(4),
+    dialogueSpacingFromBub = 60,
+    edgeRounding = 2,
+    maxHintDistance = ToPixels(30),
+    types = {
+        ["Jack"] = {
+            width = 20, height = 20, color = { 176/255, 127/255, 63/255 },
+            wait = { current = 0, max = 30 },
+            voiceLines = {
+                greeting = {
+                    "Hi! I'm Jack. Wanna play some blackjack?",
+                    "Hiya bub! The name's Jack. Wanna play some blackjack?",
+                    "Hi! My name's Jack. Down for some blackjack?",
+                    "Hey bub! My name's Jack. Wanna play blackjack?",
+                    "Hey! My name's Jack and I sure love me some blackjack. Wanna play?",
+                },
+                hitOrStay = {
+                    "What'll it be?",
+                    "Make your choice.",
+                    "Take your time!",
+                    "You got this, bub.",
+                },
+                hit = {
+                    "I like your style, bub.",
+                    "Interesting choice.",
+                    "I'm on your side, my friend.",
+                    "Let's hope this goes well.",
+                },
+                stay = {
+                    "Hmmm...",
+                },
+                outcomes = {
+                    ["player higher total"] = {
+                        "You got the higher total! Nice job, bub!",
+                        "You got the higher total! Well played, bub!",
+                        "You got the higher total! Well done!",
+                        "You got the higher total, smarty pants!",
+                    },
+                    ["player bust"] = {
+                        "You're bust! I was rootin' for you...",
+                        "You're bust! Better luck next time, bub.",
+                        "You're bust! But you had the right idea, ha-ha.",
+                        "You're bust! Practice makes perfect.",
+                    },
+                    ["player spot-on"] = {
+                        "You got 21 exactly! Didn't know I was playing a pro!.",
+                        "You got 21 exactly! Lucky bastard!",
+                        "You got 21 exactly! Didn't think you were so good, bub!",
+                        "You got 21 exactly! Excellent performance!",
+                    },
+
+                    ["dealer higher total"] = {
+                        "I got the higher total! Good game.",
+                        "I got the higher total! I had fun.",
+                        "I got the higher total, ha-ha!",
+                        "I got the higher total! How thrilling.",
+                    },
+                    ["dealer bust"] = {
+                        "I'm bust! Well done!",
+                        "I'm bust! Nicely done!",
+                        "I'm bust! Good play.",
+                        "Whoopsie, I'm bust!",
+                    },
+                    ["dealer spot-on"] = {
+                        "I got 21 exactly! That's it for you, buddy.",
+                        "I got 21 exactly! I'm legit, I swear!",
+                        "I got 21 exactly! Good game.",
+                        "I got 21 exactly! Exhilarating!",
+                        "I got 21 exactly! Gonna tell my mom about this one.",
+                    },
+
+                    ["tie"] = {
+                        "Well would you look at that? We tied!",
+                        "We tied! Well played.",
+                        "Whoops, we tied! Had fun playin' with ya, bub.",
+                    },
+                },
+                playAgain = {
+                    "Wanna play again?",
+                    "You got another one in ya?",
+                    "How about a rematch, bub?",
+                }
+            },
+            event = function (self, bub, bubIndex, event)
+                if self.wait.current <= 0 then
+                    if event == "play" then
+                        Player.blackjackCards, Blackjack.dealerCards = {}, {}
+                        BubSays(lume.randomchoice(self.voiceLines.hitOrStay), bubIndex)
+                        ResetBlackjackDeck()
+                        BlackjackDeal(2, "player"); BlackjackDeal(2, "dealer")
+                        PlaySFX(SFX.drawCard, 0.2, 1)
+                        bub.phase = "player"
+                        Blackjack.playerPlaying = true
+                        Blackjack.winner = nil
+                    elseif event == "hit" then
+                        BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex)
+                        local outcome = BlackjackDeal(1, "player")
+                        self.wait.current = 30
+                        PlaySFX(SFX.drawCard, 0.2, 1 + (#Player.blackjackCards - 2) / 8)
+
+                        if outcome == "player bust" or outcome == "player spot-on" then
+                            self.wait.current = 30
+                            bub.phase = "play again"
+                            BubSays(lume.randomchoice(self.voiceLines.outcomes[CheckBlackjackWinner(true)]), bubIndex) -- player wins or loses
+
+                            if outcome == "player bust" then
+                                PlaySFX(SFX.bust, 0.2, 1)
+                            else
+                                PlaySFX(SFX.blackjackSpotOn, 0.2, 1)
+                            end
+                        end
+                    elseif event == "stay" then
+                        BubSays(lume.randomchoice(self.voiceLines.stay), bubIndex)
+                        local outcome = CheckBlackjackWinner(true)
+                        self.wait.current = 50
+                        bub.phase = "dealer's choice"
+
+                        if outcome == "player spot-on" then
+                            self.wait.current = 30
+                            bub.phase = "play again"
+                            BubSays(lume.randomchoice(self.voiceLines.outcomes[CheckBlackjackWinner(true)]), bubIndex)
+                            PlaySFX(SFX.blackjackSpotOn, 0.2, 1)
+                        end
+                    elseif bub.phase == "dealer's choice" then
+                        local outcome
+                        local _, dealerTotal = CalculateBlackjackTotal()
+                        if dealerTotal <= 16 then
+                            BlackjackDeal(1, "dealer")
+                            outcome = CheckBlackjackWinner(true)
+                            self.wait.current = 50
+                            if outcome == "dealer bust" then PlaySFX(SFX.bust, 0.2, 1) end
+                        else
+                            outcome = CheckBlackjackWinner()
+                        end
+
+                        if outcome ~= nil then
+                            BubSays(lume.randomchoice(self.voiceLines.outcomes[outcome]), bubIndex) -- win or lose
+                            self.wait.current = 40
+                            bub.phase = "play again"
+                        end
+                    elseif bub.phase == "play again" and event == "acknowledged" then
+                        BubSays(lume.randomchoice(self.voiceLines.playAgain), bubIndex)
+                        bub.phase = "request"
+                    end
+                else
+                    self.wait.current = self.wait.current - 1 * GlobalDT
+                end
+            end
+        },
+        ["Wygore"] = {
+            width = 20, height = 50, color = { 1, 1, 1 },
+            wait = { current = 300, max = 300 },
+            voiceLines = {
+                greeting = {
+                    "Beware the decrepit hooligans... Destruction awaits you.",
+                    "Visitor. Good day. Hold [SPACE] to negate the stickiness of sticky platforms.",
+                    "Hello. Use [SPACE] just before hitting a jump pad to get an extra boost.",
+                    "Greetings. See me again and I may just give you some of my wisdom.",
+                    "Hello. Use the wind events in rainy levels to easily kill hooligans.",
+                    "Good day. Decrepit hooligans can be killed.",
+                    "Howdy. Hooligans are more orange the slower they are.",
+                    "Hello. When a hooligan targets you, they make a lower-pitched sound the bigger they are.",
+                },
+            },
+            event = function (self, bub, bubIndex, event)
+                if event == "left" then
+                    bub.disabled = true
+
+                    for _ = 1, 40 do
+                        table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {1,1,1,math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
+                    end
+
+                    PlaySFX(SFX.poof, .4, .5)
+                end
+            end
+        },
+        ["Marvin"] = {
+            width = 10, height = 10, color = { 116/255, 46/255, 1 },
+            wait = { current = 300, max = 300 },
+            voiceLines = {
+                greeting = {
+                    "Hello! I'm Marvin, and I'm a magic weatherman. Do you wish to change the weather? I'm magic, so I can do that!",
+                },
+            },
+            event = function (self, bub, bubIndex, event)
+                if event == "change weather" then
+                    bub.disabled = true
+                    for _ = 1, 40 do
+                        table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {self.color[1],self.color[2],self.color[3],math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
+                    end
+                    PlaySFX(SFX.poof, .4, .5)
+
+                    local choices = {}
+                    for key, _ in pairs(Weather.types) do
+                        if key ~= Weather.currentType then table.insert(choices, key) end
+                    end
+                    Weather.currentType = choices[math.random(#choices)]
+
+                    PlaySFX(SFX.changeWeather, .4, 1)
+                    SFX.windy:stop()
+                    SFX.rainy:stop()
+
+                    Player.bubEngagementIndex = nil
+                    bub.says = nil
+
+                    if Weather.currentType == "foggy" then
+                        for _, enemy in ipairs(Enemies) do
+                            enemy.width = enemy.width * Weather.types.foggy.enemySizeMultiplier
+                            enemy.speed = enemy.speed * Weather.types.foggy.enemySpeedMultiplier
+                        end
+                        Turrets = {}
+                    elseif Settings.musicOn then
+                        Music:play()
+                    end
+                end
+            end
+        },
+        ["Globu"] = {
+            width = 20, height = 10, color = { 125/255, 245/255, 221/255 },
+            wait = { current = 300, max = 300 },
+            voiceLines = {
+                greeting = {
+                    "Globu is I. Wish to find a thing?",
+                    "Globu. I know a thing. Want to see?",
+                    "I am Globu. Want to find a thing?",
+                },
+            },
+            event = function (self, bub, bubIndex, event)
+                if event == "find a thing" then
+                    bub.disabled = true
+                    for _ = 1, 40 do
+                        table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {self.color[1],self.color[2],self.color[3],math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
+                    end
+                    PlaySFX(SFX.poof, .4, .5)
+                    Player.bubEngagementIndex = nil
+                    bub.says = nil
+
+
+                    local pickFrom = { {}, {} }
+                    for i, t in ipairs(pickFrom) do
+                        if i == 1 then
+                            for _, shrine in ipairs(Shrines) do
+                                table.insert(t, shrine)
+                            end
+                        elseif i == 2 then
+                            for _, bub2 in ipairs(Bubs) do
+                                if not bub2.disabled then
+                                    table.insert(t, bub2)
+                                end
+                            end
+                        end
+                    end
+                    for _, t in ipairs(pickFrom) do    if #t == 0 then lume.remove(pickFrom, t) end    end
+
+                    local tablePick = pickFrom[math.random(#pickFrom)]
+                    local pick = tablePick[math.random(#tablePick)]
+
+                    local inaccuracy = 1.5
+
+                    NewWayPoint(pick.x + Jitter(ToPixels(inaccuracy)), pick.y + Jitter(ToPixels(inaccuracy)))
+                end
+            end
+        },
+    }
+}
+
+
+
 function NewBub(x, y, type)
     table.insert(Bubs, {
         x = x, y = y, type = type, phase = nil,
