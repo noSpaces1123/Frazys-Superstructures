@@ -1,7 +1,7 @@
 function LoadPlayer()
     Player = {
-        x = 0, y = Boundary.y + Boundary.height, centerX = 0, centerY = 0,
-        width = 10, height = 10, color = { 0,1,1 }, baseZoom = 0.5, zoom = 0,
+        x = 0, y = 0, centerX = 0, centerY = 0,
+        width = 10, height = 10, color = { 0,1,1 }, baseZoom = 0.6, zoom = 0,
         baseSpeed = 0.35, speed = nil, netSpeed = 0, baseJumpStrength = 20, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
         standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false }, touchingStickyObject = false, touchingBottomOfObject = false,
@@ -29,6 +29,7 @@ function LoadPlayer()
     }
     Player.jumpStrength = Player.baseJumpStrength
     Player.speed = Player.baseSpeed
+    Player.y = Boundary.y + Boundary.height - Player.height
 
     -- adjust zoom to be the same on all devices
     Player.baseZoom = 1440/love.graphics.getWidth() * Player.baseZoom

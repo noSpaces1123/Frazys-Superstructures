@@ -11,6 +11,9 @@ Changelog = Version ..
     - New: Bullet sprites
     - New: Prime turrets (only in hot weather)
 
+    Bubs:
+    - New: Wygore wisdom
+
     Hooligans:
     - New: Hooligans will now try to run away when the player is near a checkpoint
     - New: Hooligans permanently stick to a sticky platform upon contact
@@ -19,9 +22,12 @@ Changelog = Version ..
     - New: Added voice acting for the player
     - New: New posters
     - Change: Windows render distance increased from 10 to 14 meters
+    - Change: Default zoom decreased (more zoomed out)
     - Fixed: Foggy level shader overlay incorrectly centered on Windows
-    - Fixed: Scaling differences on Windows and iOS
+    - Fixed: Zoom differences on Windows and iOS
     - Fixed: Checkpoints not destroying turrets
+    - Fixed: Dialogue overriding each other
+    - Fixed: Player spawning inside the ground floor platform of every level
     
 1.6 -> 1.6.2 Changelog:
     
