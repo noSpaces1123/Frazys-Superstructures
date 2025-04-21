@@ -9,11 +9,19 @@ Changelog = Version ..
 
     Turrets:
     - New: Bullet sprites
+    - New: Prime turrets (only in hot weather)
+
+    Hooligans:
+    - New: Hooligans will now try to run away when the player is near a checkpoint
+    - New: Hooligans permanently stick to a sticky platform upon contact
 
     OTHER:
     - New: Added voice acting for the player
+    - New: New posters
     - Change: Windows render distance increased from 10 to 14 meters
     - Fixed: Foggy level shader overlay incorrectly centered on Windows
+    - Fixed: Scaling differences on Windows and iOS
+    - Fixed: Checkpoints not destroying turrets
     
 1.6 -> 1.6.2 Changelog:
     

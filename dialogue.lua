@@ -485,6 +485,7 @@ function UpdateDialogue()
             if dialogue.when() and not dialogue.done then
                 PlayDialogue(index)
                 dialogue.done = true
+                break
             end
         end
     end

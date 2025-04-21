@@ -179,23 +179,27 @@ function UpdateEnemies()
 
                         enemy.discovered = true
 
-                        local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(Jitter(20))
+                        if not enemy.stuck then
+                            local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(Jitter(20))
 
-                        if enemy.fearful and Player.netSpeed - 10 > enemyNetSpeed then
-                            angle = angle + math.rad(180)
+                            if (enemy.fearful and Player.netSpeed - 10 > enemyNetSpeed) or Player.closeToCheckpoint then
+                                angle = angle + math.rad(180)
+                            end
+
+                            local multiply = (Weather.types[Weather.currentType].enemySpeedMultiplier and Weather.types[Weather.currentType].enemySpeedMultiplier or 1)
+
+                            enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * multiply * GlobalDT
+                            enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * multiply * GlobalDT
                         end
-
-                        local multiply = (Weather.types[Weather.currentType].enemySpeedMultiplier and Weather.types[Weather.currentType].enemySpeedMultiplier or 1)
-
-                        enemy.xvelocity = enemy.xvelocity + math.sin(angle) * enemy.speed * multiply * GlobalDT
-                        enemy.yvelocity = enemy.yvelocity + math.cos(angle) * enemy.speed * multiply * GlobalDT
                     end
                 end
 
                 DoEnemyFriction(index)
 
-                enemy.x = enemy.x + enemy.xvelocity * GlobalDT
-                enemy.y = enemy.y + enemy.yvelocity * GlobalDT
+                if not enemy.stuck then
+                    enemy.x = enemy.x + enemy.xvelocity * GlobalDT
+                    enemy.y = enemy.y + enemy.yvelocity * GlobalDT
+                end
 
                 DoEnemyCollisions(index)
 
@@ -339,8 +343,6 @@ function DoEnemyCollisions(enemyIndex)
             end
 
             if closestSide ~= nil then
-                Enemies[enemyIndex].rotationVelocity = Enemies[enemyIndex].rotationVelocity + CalculateRotationVelocity(closestSide, Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity)
-
                 if not obj.impenetrable and Weather.currentType == "foggy" and Enemies[enemyIndex].seesPlayer and lume.randomchoice({true,false}) then
                     local maxHearingDistance = ToPixels(6)
                     local distance = Distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
@@ -352,6 +354,19 @@ function DoEnemyCollisions(enemyIndex)
                     Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity = 0, 0
 
                     StartSlowMo(false, false, false)
+                end
+
+                if obj.type == "sticky" then
+                    local before = Enemies[enemyIndex].stuck
+                    Enemies[enemyIndex].stuck = true
+                    Enemies[enemyIndex].rotationVelocity, Enemies[enemyIndex].rotationRadians = 0, 0
+
+                    if not before then
+                        PlaySFX(SFX.stick, .3, 1.5)
+                    end
+                else
+                    Enemies[enemyIndex].rotationVelocity = Enemies[enemyIndex].rotationVelocity + CalculateRotationVelocity(closestSide, Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity)
+                    Enemies[enemyIndex].stuck = false
                 end
             end
 

@@ -1,3 +1,7 @@
+WeatherPalette = { clear = 8, rainy = 6, hot = 4, foggy = 1 }
+
+
+
 function InitialiseWeather()
     Weather = {
         currentType = "clear",

@@ -14,9 +14,7 @@ function love.load()
 
     NameOfTheGame = "Frazy's Superstructures"
 
-    love.window.updateMode(love.graphics.getWidth(), love.graphics.getHeight())
     love.window.setTitle(NameOfTheGame)
-    love.window.setFullscreen(true)
 
     love.filesystem.setIdentity("Adam's Superstructures")
 
@@ -66,6 +64,7 @@ function love.load()
         poof = love.audio.newSource("assets/sfx/poof.wav", "static"),
         changeWeather = love.audio.newSource("assets/sfx/change weather.wav", "static"),
         heart = love.audio.newSource("assets/sfx/heart.wav", "static"),
+        primeShoot = love.audio.newSource("assets/sfx/prime shoot.wav", "static"),
         checkpointFizzleOut = {
             love.audio.newSource("assets/sfx/checkpoint fizzle out.wav", "static"),
             love.audio.newSource("assets/sfx/checkpoint fizzle out2.wav", "static"),
@@ -110,6 +109,7 @@ function love.load()
         fullControls = love.graphics.newImage("assets/sprites/full controls.png", {dpiscale=7}),
         jacksHat = love.graphics.newImage("assets/sprites/jack's hat.png", {dpiscale=13}),
         bullet = love.graphics.newImage("assets/sprites/bullet.png", {dpiscale=11}),
+        homingCross = love.graphics.newImage("assets/sprites/homing cross.png", {dpiscale=2}),
         posters = {}
     }
     for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/posters")) do
@@ -264,8 +264,6 @@ function love.load()
 
     InitialiseWeather()
 
-    WeatherPalette = { clear = 8, rainy = 6, hot = 4, foggy = 1 }
-    TurretGenerationPalette = { normal = 20, laser = 4, drag = 2, push = 6 }
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
         ["Will of the Frogman"] = 5,
@@ -1176,8 +1174,12 @@ function FinalLevelReached()
 
     if BestGameCompletionTime == nil or TotalTime > BestGameCompletionTime then
         BestGameCompletionTime = TotalTime
-        SaveData()
     end
+
+    Level = 1
+    CorrectBoundaryHeight()
+    LoadPlayer()
+    SaveData()
 end
 function CheckIfShouldBeDescending()
     for _, on in ipairs(Descending.onLevels) do
@@ -2226,7 +2228,7 @@ end
 function UpdateMovables()
     UpdateTurrets()
     UpdateEnemies()
-    CheckCollisionWithCheckpoints()
+    CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
 end
 function GetThreadData()
     local dataTurrets = love.thread.getChannel("turrets"):pop()

@@ -1,7 +1,7 @@
 function LoadPlayer()
     Player = {
         x = 0, y = Boundary.y + Boundary.height, centerX = 0, centerY = 0,
-        width = 10, height = 10, color = { 0,1,1 }, baseZoom = 0.4, zoom = 0,
+        width = 10, height = 10, color = { 0,1,1 }, baseZoom = 0.5, zoom = 0,
         baseSpeed = 0.35, speed = nil, netSpeed = 0, baseJumpStrength = 20, jumpStrength = nil, wallJumpXStrength = 10, jumped = false,
         xvelocity = 0, yvelocity = 0,
         standingOnObject = false, standingOnIcyObject = false, touchingObject = false, touchingSideOfObject = { left = false, right = false }, touchingStickyObject = false, touchingBottomOfObject = false,
@@ -24,12 +24,19 @@ function LoadPlayer()
         selfDestruct = { current = 0, max = 100 },
         speedMultiplierWhenDestroyingTurret = 2,
         invisible = false, draw = true,
+        closeToCheckpoint = false, closeToCheckpointMinimumDistance = ToPixels(2),
+        warningSine = 0,
     }
     Player.jumpStrength = Player.baseJumpStrength
     Player.speed = Player.baseSpeed
+
+    -- adjust zoom to be the same on all devices
+    Player.baseZoom = 1440/love.graphics.getWidth() * Player.baseZoom
+
     Player.zoom = Player.baseZoom
     WayPoints = {}
 end
+
 function RespawnPlayer()
     if Player.checkpoint.x == nil and Player.checkpoint.y == nil then
         Player.x, Player.y = 0, (Descending.doingSo and 0 or Boundary.y + Boundary.height)
@@ -92,6 +99,8 @@ function UpdatePlayer()
     if not Zen.doingSo then
         Player.netSpeed = Pythag(Player.xvelocity, Player.yvelocity)
 
+        Player.targeted = false -- this will be updated across other functions
+
         if not Player.respawnWait.dead and not NextLevelAnimation.running and not Paused and not Descending.hooligmanCutscene.running and not CommandLine.typing then
             Player.yvelocity = ApplyGravity(Player)
             Player.xvelocity = ApplyWind(Player.xvelocity)
@@ -104,7 +113,6 @@ function UpdatePlayer()
             DoPlayerFriction()
             CheckIfPlayerHasCompletedLevel()
             UpdatePlayerTemperature()
-            CheckCollisionWithBullets()
             CheckCollisionWithWayPoint()
             DoPlayerGoalMagentismParticles()
             UpdatePlayerSuperJumpBar()
@@ -795,14 +803,6 @@ function UpdatePlayerRespawnWait()
     end
 end
 
-function CheckCollisionWithBullets()
-    for _, bullet in ipairs(Bullets) do
-        if Distance(bullet.x, bullet.y, Player.centerX, Player.centerY) <= Player.width / 2 + TurretGlobalData.bulletRadius then
-            KillPlayer()
-        end
-    end
-end
-
 function UpdatePlayerSuperJumpBar()
     if Player.superJump.current >= Player.superJump.max then
         Player.superJump.current = Player.superJump.max
@@ -899,28 +899,52 @@ function DoObjectEffects()
     end
 end
 
-function CheckCollisionWithCheckpoints()
+function CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
     for _, checkpoint in ipairs(Checkpoints) do
-        if checkpoint.x ~= Player.checkpoint.x and checkpoint.y ~= Player.checkpoint.y and Distance(Player.x, Player.y, checkpoint.x, checkpoint.y) <= Player.width / 2 + CheckpointGlobalData.radius * 1.2 then
-            if Weather.currentType == "rainy" and not Player.waterProofCheckpoints then
-                local sfxIsPlaying = false
-                for _, value in ipairs(SFX.checkpointFizzleOut) do
-                    if value:isPlaying() then sfxIsPlaying = true; break end
-                end
+        if checkpoint.x ~= Player.checkpoint.x and checkpoint.y ~= Player.checkpoint.y then
 
-                if not sfxIsPlaying then
-                    PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
+            local distance = Distance(Player.x, Player.y, checkpoint.x, checkpoint.y)
 
-                    TriggerDialogue(57)
+            if distance <= Player.width / 2 + CheckpointGlobalData.radius * 1.2 then
+                if Weather.currentType == "rainy" and not Player.waterProofCheckpoints then
+                    local sfxIsPlaying = false
+                    for _, value in ipairs(SFX.checkpointFizzleOut) do
+                        if value:isPlaying() then sfxIsPlaying = true; break end
+                    end
 
-                    for _ = 1, 20 do
+                    if not sfxIsPlaying then
+                        PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
+
+                        TriggerDialogue(57)
+
+                        for _ = 1, 20 do
+                            local degrees = math.random(360)
+                            local radius = math.random() * 3 + 2
+                            local speed = math.random() * 5 + 2
+                            local decay = math.random(400, 600)
+                            table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
+                            function (self)
+                                self.degrees = self.degrees + Jitter(60)
+                                if self.speed > 0 then
+                                    self.speed = self.speed - 0.02 * GlobalDT
+                                    if self.speed <= 0 then
+                                        self.speed = 0
+                                    end
+                                end
+                            end))
+                        end
+                    end
+                else
+                    SetCheckpoint(checkpoint)
+                    SaveData()
+
+                    for _ = 1, 30 do
                         local degrees = math.random(360)
-                        local radius = math.random() * 3 + 2
-                        local speed = math.random() * 5 + 2
-                        local decay = math.random(400, 600)
+                        local radius = math.random() * 3 + 4
+                        local speed = math.random() * 6 + 6
+                        local decay = math.random(100, 160)
                         table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
                         function (self)
-                            self.degrees = self.degrees + Jitter(60)
                             if self.speed > 0 then
                                 self.speed = self.speed - 0.02 * GlobalDT
                                 if self.speed <= 0 then
@@ -929,45 +953,28 @@ function CheckCollisionWithCheckpoints()
                             end
                         end))
                     end
-                end
-            else
-                SetCheckpoint(checkpoint)
-                SaveData()
 
-                for _ = 1, 30 do
-                    local degrees = math.random(360)
-                    local radius = math.random() * 3 + 4
-                    local speed = math.random() * 6 + 6
-                    local decay = math.random(100, 160)
-                    table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
-                    function (self)
-                        if self.speed > 0 then
-                            self.speed = self.speed - 0.02 * GlobalDT
-                            if self.speed <= 0 then
-                                self.speed = 0
-                            end
+                    for _, turret in ipairs(Turrets) do
+                        if Distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
+                            ExplodeTurret(turret)
                         end
-                    end))
-                end
-
-                for _, turret in ipairs(Enemies) do
-                    if Distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
-                        ExplodeTurret(turret)
                     end
-                end
 
-                for _, enemy in ipairs(Enemies) do
-                    if Distance(enemy.x, enemy.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
-                        ExplodeEnemy(enemy)
+                    for _, enemy in ipairs(Enemies) do
+                        if Distance(enemy.x, enemy.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
+                            ExplodeEnemy(enemy)
+                        end
                     end
                 end
             end
+
+            Player.closeToCheckpoint = distance <= Player.closeToCheckpointMinimumDistance
         end
     end
 end
-function SetCheckpoint(checkpoint)
-    Player.checkpoint.x = checkpoint.x
-    Player.checkpoint.y = checkpoint.y
+function SetCheckpoint(checkpointObject)
+    Player.checkpoint.x = checkpointObject.x
+    Player.checkpoint.y = checkpointObject.y
 
     PlaySFX(SFX.checkpoint, .7, math.random() + .9)
 end

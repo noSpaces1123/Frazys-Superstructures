@@ -1,7 +1,6 @@
 TurretGlobalData = {
     height = 50,
-    bulletRadius = 5,
-    bulletSpeed = 7,
+    bulletRadius = 5, bulletSpeed = 7, bulletTurnSpeed = math.rad(3),
     fireInterval = { min = 36, max = 100 },
     viewRadius = { min = 800, max = 1300 },
     inaccuracy = { min = 0, max = 10 },
@@ -17,6 +16,8 @@ TurretGlobalData = {
         ["peaceful"] = 1,
     },
 }
+
+TurretGenerationPalette = { normal = 20, laser = 4, drag = 2, push = 6, prime = 5 }
 
 
 
@@ -71,10 +72,16 @@ function SpawnTurrets(playerSafeArea)
 end
 function NewTurret(x, y, fireInterval, notOnMap)
     local palette = TurretGenerationPalette
+
     if Weather.currentType == "rainy" then
         palette.drag = 0
     else
         palette.push = 0
+    end
+    if Weather.currentType == "hot" then
+        palette.normal = 0
+    else
+        palette.prime = 0
     end
 
     table.insert(Turrets, {
@@ -156,7 +163,7 @@ function UpdateTurrets()
                         if turret.type == "normal" then
                             PlaySFX(SFX.shoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
                             turret.fireRate.current = 0
-                            FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed, turretIndex)
+                            FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed, 1)
                         elseif turret.type == "laser" then
                             PlaySFX(SFX.jump, .1, .6)
                             IncreasePlayerTemperature(2.5)
@@ -180,6 +187,10 @@ function UpdateTurrets()
                                     end
                                 end
                             end))
+                        elseif turret.type == "prime" then
+                            PlaySFX(SFX.primeShoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
+                            turret.fireRate.current = 0
+                            FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed*1.4, 0.6, true)
                         end
 
                         if turret.mood == "angry" then
@@ -255,11 +266,15 @@ function DrawTurrets()
         elseif turret.type == "push" then
             love.graphics.setColor(1,0,.7)
             love.graphics.setLineWidth(3)
+        elseif turret.type == "prime" then
+            love.graphics.setColor(0,1,.7)
+            love.graphics.setLineWidth(5)
         end
 
         local x, y = turret.x, turret.y
         if turret.mood == "angry" then
-            x, y = x + Jitter(5), y + Jitter(5)
+            local jitter = 8
+            x, y = x + Jitter(jitter), y + Jitter(jitter)
         end
 
         love.graphics.circle("fill", x, y, TurretGlobalData.headRadius * (Minimap.showing and 2 or 1), 100)
@@ -274,6 +289,8 @@ function DrawTurrets()
         elseif turret.type == "push" then
             alpha = .2
             love.graphics.setColor(1,0,.7, alpha * math.random())
+        elseif turret.type == "prime" then
+            love.graphics.setColor(0,1,.7, alpha)
         end
 
         if turret.seesPlayer then
@@ -367,73 +384,90 @@ function DrawThreatBox(turret)
     love.graphics.pop()
 end
 
-function FireBullet(x, y, angle, speed, originTurretIndex)
-    local lifespan = 400
+function FireBullet(x, y, angle, speed, size, homing)
     table.insert(Bullets, {
-        x = x, y = y, radius = TurretGlobalData.bulletRadius, warningProgression = 0, angle = angle,
-        draw = function (self)
-            love.graphics.setColor(1,1,1)
-
-            love.graphics.push()
-            love.graphics.translate(self.x, self.y)
-            love.graphics.rotate(-angle + math.rad(180))
-            love.graphics.draw(Sprites.bullet, -Sprites.bullet:getWidth()/2, -Sprites.bullet:getHeight()/2)
-            love.graphics.pop()
-
-            local maxdistance, checks = 1300, 20
-            for i = 0, maxdistance, maxdistance / checks do
-                if Distance(Player.centerX, Player.centerY,
-                self.x + math.sin(self.angle) * i, self.y + math.cos(self.angle) * i) <= Player.width / 2 + self.radius + maxdistance/checks * 2 then
-                    self.warningProgression = self.warningProgression + .1 * GlobalDT
-                    if self.warningProgression > 1 then
-                        self.warningProgression = 1
-                    end
-                else
-                    self.warningProgression = self.warningProgression - 0.02 * GlobalDT
-                    if self.warningProgression < 0 then
-                        self.warningProgression = 0
-                    end
-                end
-            end
-
-            love.graphics.setColor(1,0,0)
-            love.graphics.setLineWidth(3)
-            love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression), 100)
-        end,
-        update = function (self)
-            local distanceToPlayer = Distance(Player.centerX, Player.centerY, self.x, self.y)
-            local multiplier = Lerp(0.3, 1, Clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
-
-            self.x = self.x + math.sin(self.angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
-            self.y = self.y + math.cos(self.angle) * speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
-
-            lifespan = lifespan - 1 * GlobalDT
-            if lifespan < 0 then
-                lume.remove(Bullets, self)
-            end
-
-            local maxLifeForShrink = 50
-            if lifespan <= maxLifeForShrink then
-                local ratio = lifespan / maxLifeForShrink
-                self.radius = TurretGlobalData.bulletRadius * ratio
-            end
-
-            --[[
-            for index, turret in ipairs(Turrets) do
-                if index ~= originTurretIndex and Distance(turret.x, turret.y, self.x, self.y) <= TurretGlobalData.headRadius + TurretGlobalData.bulletRadius then
-                    ExplodeTurret(turret)
-                end
-            end]]
-        end
+        x = x, y = y, radius = TurretGlobalData.bulletRadius, warningProgression = 0,
+        angle = angle,
+        speed = speed,
+        size = size, startSize = size,
+        lifespan = 400,
+        homing = homing,
     })
 end
 function UpdateBullets()
-    for _, bullet in ipairs(Bullets) do
-        bullet:update()
+    for _, self in ipairs(Bullets) do
+        local distanceToPlayer = Distance(Player.centerX, Player.centerY, self.x, self.y)
+        local multiplier = Lerp(0.3, 1, Clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
+
+        if self.homing and not Player.respawnWait.dead then
+            local targetAngle = AngleBetween(self.x, self.y, Player.centerX, Player.centerY)
+
+            if self.angle < targetAngle then
+                self.angle = self.angle + TurretGlobalData.bulletTurnSpeed * GlobalDT
+                if self.angle > targetAngle then self.angle = targetAngle end
+            elseif self.angle > targetAngle then
+                self.angle = self.angle - TurretGlobalData.bulletTurnSpeed * GlobalDT
+                if self.angle < targetAngle then self.angle = targetAngle end
+            end
+
+            Player.targeted = true
+        end
+
+        self.x = self.x + math.sin(self.angle) * self.speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
+        self.y = self.y + math.cos(self.angle) * self.speed * GlobalDT * (PlayerPerks["Instinct of the Bullet Jumper"] and multiplier or 1)
+
+        self.lifespan = self.lifespan - 1 * GlobalDT
+        if self.lifespan < 0 then
+            lume.remove(Bullets, self)
+        end
+
+        local maxLifeForShrink = 50
+        if self.lifespan <= maxLifeForShrink then
+            local ratio = self.lifespan / maxLifeForShrink
+            self.size = self.startSize * ratio
+            self.radius = TurretGlobalData.bulletRadius * ratio
+        end
+
+        if not Player.respawnWait.dead and Distance(self.x, self.y, Player.centerX, Player.centerY) <= Player.width / 2 + TurretGlobalData.bulletRadius * self.size then
+            KillPlayer()
+        end
+
+        --[[
+        for index, turret in ipairs(Turrets) do
+            if index ~= originTurretIndex and Distance(turret.x, turret.y, self.x, self.y) <= TurretGlobalData.headRadius + TurretGlobalData.bulletRadius then
+                ExplodeTurret(turret)
+            end
+        end]]
     end
 end
 function DrawBullets()
-    for _, bullet in ipairs(Bullets) do
-        bullet:draw()
+    for _, self in ipairs(Bullets) do
+        local color = (self.homing and {0,1,.7} or {1,0,0})
+
+        love.graphics.push()
+        love.graphics.translate(self.x, self.y)
+        love.graphics.rotate(-self.angle + math.rad(180))
+        love.graphics.setColor(color) ; love.graphics.draw(Sprites.bullet, -Sprites.bullet:getWidth()*self.size/2, -Sprites.bullet:getHeight()*self.size/2, 0, self.size, self.size)
+        love.graphics.pop()
+
+        local maxdistance, checks = 1300, 20
+        for i = 0, maxdistance, maxdistance / checks do
+            if Distance(Player.centerX, Player.centerY,
+            self.x + math.sin(self.angle) * i, self.y + math.cos(self.angle) * i) <= Player.width / 2 + self.radius + maxdistance/checks * 2 then
+                self.warningProgression = self.warningProgression + .1 * GlobalDT
+                if self.warningProgression > 1 then
+                    self.warningProgression = 1
+                end
+            else
+                self.warningProgression = self.warningProgression - 0.02 * GlobalDT
+                if self.warningProgression < 0 then
+                    self.warningProgression = 0
+                end
+            end
+        end
+
+        love.graphics.setColor(color)
+        love.graphics.setLineWidth(3)
+        love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression) * self.size, 100)
     end
 end

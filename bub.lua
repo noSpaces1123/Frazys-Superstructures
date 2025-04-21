@@ -161,6 +161,8 @@ BubGlobalData = {
                     "Good day. Decrepit hooligans can be killed.",
                     "Howdy. Hooligans are more orange the slower they are.",
                     "Hello. When a hooligan targets you, they make a lower-pitched sound the bigger they are.",
+                    "Hello. Turrets have a chance to be friendly or overly angry.",
+                    "I will see you another time. Toodles.",
                 },
             },
             event = function (self, bub, bubIndex, event)
