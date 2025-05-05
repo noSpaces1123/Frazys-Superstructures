@@ -40,7 +40,7 @@ end
 
 function RespawnPlayer()
     if Player.checkpoint.x == nil and Player.checkpoint.y == nil then
-        Player.x, Player.y = 0, (Descending.doingSo and 0 or Boundary.y + Boundary.height)
+        Player.x, Player.y = 0, (Descending.doingSo and 0 or Boundary.y + Boundary.height - Player.height)
     else
         Player.x, Player.y = Player.checkpoint.x, Player.checkpoint.y
     end
@@ -52,7 +52,7 @@ function RespawnPlayer()
     MessageWithPlayerStats()
     ApplyShrineEffects()
 
-    PlaySFX(SFX.playerSpawn, 0.5, 1)
+    zutil.playsfx(SFX.playerSpawn, 0.5, 1)
 end
 function ResetPlayerData()
     PlayerSkill = {
@@ -98,7 +98,7 @@ function UpdatePlayer()
     UpdateKeyBuffer()
 
     if not Zen.doingSo then
-        Player.netSpeed = Pythag(Player.xvelocity, Player.yvelocity)
+        Player.netSpeed = zutil.pythag(Player.xvelocity, Player.yvelocity)
 
         Player.targeted = false -- this will be updated across other functions
 
@@ -237,7 +237,7 @@ function love.mousepressed(mx, my, button)
             local x, y = love.graphics.inverseTransformPoint(mx, my)
 
             for _, waypoint in ipairs(WayPoints) do
-                if Distance(waypoint.x, waypoint.y, x, y) <= waypoint.radius * 5 then
+                if zutil.distance(waypoint.x, waypoint.y, x, y) <= waypoint.radius * 5 then
                     lume.remove(WayPoints, waypoint)
                     goto removedWayPoint
                 end
@@ -262,10 +262,10 @@ end
 function love.wheelmoved(_, y)
     if GameState == "changelog" then
         local textHeight = love.graphics.newText(Fonts.changelog, Changelog):getHeight() - love.graphics.getHeight() + 90
-        ChangelogYOffset = Clamp(ChangelogYOffset + y * 10, -textHeight, 0)
+        ChangelogYOffset = zutil.clamp(ChangelogYOffset + y * 10, -textHeight, 0)
     elseif Minimap.showing then
         local sound = function ()
-            PlaySFX(SFX.zoom, 0.03, 1 - Minimap.zoom + 1)
+            zutil.playsfx(SFX.zoom, 0.03, 1 - Minimap.zoom + 1)
         end
 
         local speed = 0.007
@@ -277,9 +277,9 @@ function love.wheelmoved(_, y)
             sound()
         end
 
-        Minimap.zoom = Clamp(Minimap.zoom, 0.05, 0.15)
+        Minimap.zoom = zutil.clamp(Minimap.zoom, 0.05, 0.15)
     elseif Zen.doingSo then
-        Zen.zoom = Clamp(Zen.zoom + 0.007 * y, 0.05, 0.4)
+        Zen.zoom = zutil.clamp(Zen.zoom + 0.007 * y, 0.05, 0.4)
     end
 end
 
@@ -321,22 +321,22 @@ function DrawPlayer()
     local toX, toY = Player.centerX - Player.xvelocity, Player.centerY - Player.yvelocity
 
     for _, turret in ipairs(Enemies) do
-        local distance = Distance(Player.centerX, Player.centerY, turret.x, turret.y)
+        local distance = zutil.distance(Player.centerX, Player.centerY, turret.x, turret.y)
         if distance < closestDistance then
             closestDistance = distance
             toX, toY = turret.x, turret.y
         end
     end
     for _, enemy in ipairs(Enemies) do
-        local distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+        local distance = zutil.distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
         if not enemy.dead and distance < closestDistance then
             closestDistance = distance
             toX, toY = enemy.x + enemy.width / 2, enemy.y + enemy.width / 2
         end
     end
 
-    local multiply = Player.width / 6 * (closestDistance == seeRadius and Clamp(Player.netSpeed / 4, 0, 1) or 1)
-    local angle = AngleBetween(toX, toY, Player.centerX, Player.centerY) + (closestDistance == seeRadius and 0 or math.rad(180))
+    local multiply = Player.width / 6 * (closestDistance == seeRadius and zutil.clamp(Player.netSpeed / 4, 0, 1) or 1)
+    local angle = zutil.angleBetween(toX, toY, Player.centerX, Player.centerY) + (closestDistance == seeRadius and 0 or math.rad(180))
     local eyeX, eyeY = Player.centerX + math.sin(angle) * multiply, Player.centerY + math.cos(angle) * multiply
     local eyeRadius = Player.width * 0.3
 
@@ -423,7 +423,7 @@ function DoPlayerFriction()
     if not Player.standingOnObject then
         friction = friction + Weather.types[Weather.currentType].airFrictionAdd()
     elseif Weather.currentType == "rainy" and Player.standingOnObject then
-        friction = Clamp(friction - math.random() * Weather.types[Weather.currentType].groundFrictionRandomness(), 0, math.huge)
+        friction = zutil.clamp(friction - math.random() * Weather.types[Weather.currentType].groundFrictionRandomness(), 0, math.huge)
     end
 
     if Player.xvelocity > 0 and not Player.pressing.d then
@@ -487,20 +487,20 @@ function DoPlayerCollisions()
                 }
 
                 for index, side in ipairs(sides) do
-                    local distance = Distance(side.x, side.y, playerCenter.x, playerCenter.y)
+                    local distance = zutil.distance(side.x, side.y, playerCenter.x, playerCenter.y)
                     if distance < closestDistance then
                         closestDistance = distance
                         closestSide = index
                     end
                 end
 
-                PlaySFX(SFX.hit, ConvertVelocityToHitSFXVolume(Player.xvelocity, Player.yvelocity), math.random() / 10 + .95)
+                zutil.playsfx(SFX.hit, ConvertVelocityToHitSFXVolume(Player.xvelocity, Player.yvelocity), math.random() / 10 + .95)
                 DoPlayerHitObjectParticles(closestSide)
 
                 if obj.type == "icy" and Player.temperature.current > Player.temperature.max / 3 then
-                    PlaySFX(SFX.cool, 0.1, 2)
+                    zutil.playsfx(SFX.cool, 0.1, 2)
                 elseif obj.type == "sticky" then
-                    PlaySFX(SFX.stick, 0.2, math.random() / 10 + 0.95)
+                    zutil.playsfx(SFX.stick, 0.2, math.random() / 10 + 0.95)
                 end
 
                 if PlayerPerks["Power of the Achiever"] then
@@ -559,7 +559,7 @@ function DoPlayerCollisions()
 
     -- newly hit the ground?
     if not wasStandingOnObject and Player.standingOnObject then
-        PlaySFX(SFX.hit, ConvertVelocityToHitSFXVolume(Player.xvelocity, Player.yvelocity), math.random() / 10 + .95)
+        zutil.playsfx(SFX.hit, ConvertVelocityToHitSFXVolume(Player.xvelocity, Player.yvelocity), math.random() / 10 + .95)
     end
 
     -- coyote time
@@ -569,7 +569,7 @@ function DoPlayerCollisions()
 
     -- unstick soundalound
     if wasTouchingStickyObject and not Player.touchingStickyObject then
-        PlaySFX(SFX.unstick, 0.1, math.random()/10 + .95)
+        zutil.playsfx(SFX.unstick, 0.1, math.random()/10 + .95)
     end
 end
 
@@ -588,7 +588,7 @@ end
 
 function ConvertVelocityToHitSFXVolume(xvelocity, yvelocity)
     local vol = (math.abs(xvelocity) / 20 + math.abs(yvelocity)) / 2
-    return Clamp(vol, 0.2, 1)
+    return zutil.clamp(vol, 0.2, 1)
 end
 
 function ConvertXIntoYVelocity()
@@ -694,15 +694,15 @@ function CheckAndIfSoDoPlayerSmash(objIndex)
 
     if not Objects[objIndex].impenetrable then
         SmashObject(Objects[objIndex])
-        PlaySFX(SFX.smash, .7, math.random() / 10 + .95)
+        zutil.playsfx(SFX.smash, .7, math.random() / 10 + .95)
     else
-        PlaySFX(SFX.clang, .6, math.random() / 10 + .95)
+        zutil.playsfx(SFX.clang, .6, math.random() / 10 + .95)
     end
 end
 
 function ConvertPlayerVelocityToCameraLookAhead()
     local xtowards, ytowards = (Player.xvelocity > 0 and -1 or 1), (Player.yvelocity > 0 and -1 or 1)
-    return Clamp((math.abs(Player.xvelocity) - 5) / 3, 0, math.huge) * xtowards, Clamp((math.abs(Player.yvelocity) - 5) / 3, 0, math.huge) * ytowards
+    return zutil.clamp((math.abs(Player.xvelocity) - 5) / 3, 0, math.huge) * xtowards, zutil.clamp((math.abs(Player.yvelocity) - 5) / 3, 0, math.huge) * ytowards
 end
 function ConvertPlayerVelocityToCameraRotation()
     if not Settings.cameraRotationOn then return 0 end
@@ -710,8 +710,8 @@ function ConvertPlayerVelocityToCameraRotation()
 end
 function CalculateZoom()
     local minVelocity = 15
-    local zoom = 1 - Clamp(math.abs(Player.xvelocity) / 200 - minVelocity / 300, 0, math.huge) / 2
-    return Clamp(zoom, .4, 1) - Player.zoom
+    local zoom = 1 - zutil.clamp(math.abs(Player.xvelocity) / 200 - minVelocity / 300, 0, math.huge) / 2
+    return zutil.clamp(zoom, .4, 1) - Player.zoom
 end
 
 function UpdateBlips()
@@ -725,7 +725,7 @@ function UpdateBlips()
             local pitch = 0.5 + playerSpeed / 200
             local volume = playerSpeed / 250
             Player.blips.interval.max = 7 - playerSpeed / 20
-            PlaySFX(SFX.blip, volume, pitch)
+            zutil.playsfx(SFX.blip, volume, pitch)
         end
     end
 end
@@ -749,7 +749,7 @@ function UpdatePlayerTemperature()
 end
 
 function DragPlayerTowards(x, y, strength)
-    local angle = AngleBetween(Player.centerX, Player.centerY, x, y)
+    local angle = zutil.angleBetween(Player.centerX, Player.centerY, x, y)
 
     Player.xvelocity = Player.xvelocity + math.sin(angle) * strength
     Player.yvelocity = Player.yvelocity + math.cos(angle) * strength
@@ -785,7 +785,7 @@ function KillPlayer()
 
     SaveData()
 
-    PlaySFX(SFX.death, 0.7, 1)
+    zutil.playsfx(SFX.death, 0.7, 1)
 
     Paused = false
     SlowMo.running = false
@@ -813,13 +813,13 @@ function UpdatePlayerSuperJumpBar()
 
         if not Player.superJump.replenished and Player.superJump.current >= Player.superJump.cost then
             Player.superJump.replenished = true
-            PlaySFX(SFX.superJumpReplenish, .4, 1)
+            zutil.playsfx(SFX.superJumpReplenish, .4, 1)
         elseif Player.superJump.current < Player.superJump.cost then
             Player.superJump.replenished = false
         end
 
         if Player.superJump.current >= Player.superJump.max then
-            PlaySFX(SFX.superJumpFull, .4, 1)
+            zutil.playsfx(SFX.superJumpFull, .4, 1)
         end
     end
 end
@@ -830,14 +830,14 @@ function DrawPlayerSuperJumpBar()
     local padding = 20
     love.graphics.setColor((CanSuperJump() and Player.color or {1,1,1}))
 
-    love.graphics.rectangle("fill", love.graphics.getWidth() - width - padding, padding, Lerp(0, width, Player.superJump.current / Player.superJump.max), height, 2, 2)
+    love.graphics.rectangle("fill", love.graphics.getWidth() - width - padding, padding, zutil.lerp(0, width, Player.superJump.current / Player.superJump.max), height, 2, 2)
 
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", love.graphics.getWidth() - width - padding, padding, width, height, 2, 2)
 
     love.graphics.setLineWidth(1)
     for i = Player.superJump.cost, Player.superJump.max, Player.superJump.cost do
-        local x = love.graphics.getWidth() - width - padding + Lerp(0, width, i / Player.superJump.max)
+        local x = love.graphics.getWidth() - width - padding + zutil.lerp(0, width, i / Player.superJump.max)
         love.graphics.line(x, padding, x, padding + height)
     end
 end
@@ -848,27 +848,11 @@ function DoPlayerSuperJump()
         Player.touchingStickyObject = false
         Player.yvelocity = Player.yvelocity + Player.superJumpStrength * (Descending.doingSo and 1 or -1)
         Player.superJump.current = Player.superJump.current - Player.superJump.cost
-        PlaySFX(SFX.superJump, .7, 1)
+        zutil.playsfx(SFX.superJump, .7, 1)
     end
 end
 function CanSuperJump()
     return Player.superJump.current - Player.superJump.cost >= 0
-end
-
-function Pythag(a, b)
-    return math.sqrt(a^2 + b^2)
-end
-function Lerp(a, b, t)
-    return a + (b - a) * t
-end
-function ReverseLerp(a, b, x)
-    return (x - a) / (b - a)
-end
-function Midpoint(x1, y1, x2, y2)
-    return (x1 + x2) / 2, (y1 + y2) / 2
-end
-function Distance(x1, y1, x2, y2)
-    return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
 end
 
 function DoObjectEffects()
@@ -904,7 +888,7 @@ function CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
     for _, checkpoint in ipairs(Checkpoints) do
         if checkpoint.x ~= Player.checkpoint.x and checkpoint.y ~= Player.checkpoint.y then
 
-            local distance = Distance(Player.x, Player.y, checkpoint.x, checkpoint.y)
+            local distance = zutil.distance(Player.x, Player.y, checkpoint.x, checkpoint.y)
 
             if distance <= Player.width / 2 + CheckpointGlobalData.radius * 1.2 then
                 if Weather.currentType == "rainy" and not Player.waterProofCheckpoints then
@@ -914,7 +898,7 @@ function CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
                     end
 
                     if not sfxIsPlaying then
-                        PlaySFX(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
+                        zutil.playsfx(lume.randomchoice(SFX.checkpointFizzleOut), 0.3, math.random()/10+1)
 
                         TriggerDialogue(57)
 
@@ -925,7 +909,7 @@ function CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
                             local decay = math.random(400, 600)
                             table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, radius, {1,0,1,math.random()/2+.5}, speed, degrees, 0.01, decay,
                             function (self)
-                                self.degrees = self.degrees + Jitter(60)
+                                self.degrees = self.degrees + zutil.jitter(60)
                                 if self.speed > 0 then
                                     self.speed = self.speed - 0.02 * GlobalDT
                                     if self.speed <= 0 then
@@ -956,13 +940,13 @@ function CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
                     end
 
                     for _, turret in ipairs(Turrets) do
-                        if Distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
+                        if zutil.distance(turret.x, turret.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
                             ExplodeTurret(turret)
                         end
                     end
 
                     for _, enemy in ipairs(Enemies) do
-                        if Distance(enemy.x, enemy.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
+                        if zutil.distance(enemy.x, enemy.y, checkpoint.x, checkpoint.y) <= CheckpointGlobalData.clearRadius then
                             ExplodeEnemy(enemy)
                         end
                     end
@@ -977,7 +961,7 @@ function SetCheckpoint(checkpointObject)
     Player.checkpoint.x = checkpointObject.x
     Player.checkpoint.y = checkpointObject.y
 
-    PlaySFX(SFX.checkpoint, .7, math.random() + .9)
+    zutil.playsfx(SFX.checkpoint, .7, math.random() + .9)
 end
 
 function CalculatePlayerSkill()
@@ -999,7 +983,7 @@ function CalculatePlayerGreatestBulletPresence()
     local maxDistance = 600
     local count = 0
     for _, bullet in ipairs(Bullets) do
-        if Distance(bullet.x, bullet.y, Player.centerX, Player.centerY) <= maxDistance then
+        if zutil.distance(bullet.x, bullet.y, Player.centerX, Player.centerY) <= maxDistance then
             count = count + 1
         end
     end
@@ -1030,7 +1014,7 @@ function ToggleMinimap()
         Paused = Minimap.wasPaused
     end
 
-    PlaySFX(SFX.toggleMinimap, 0.2, 1)
+    zutil.playsfx(SFX.toggleMinimap, 0.2, 1)
 end
 function DrawMinimap()
     love.graphics.push()
@@ -1080,7 +1064,7 @@ function NewWayPoint(x, y)
 end
 function CheckCollisionWithWayPoint()
     for _, waypoint in ipairs(WayPoints) do
-        if Distance(Player.centerX, Player.centerY, waypoint.x, waypoint.y) <= waypoint.radius * 4 then
+        if zutil.distance(Player.centerX, Player.centerY, waypoint.x, waypoint.y) <= waypoint.radius * 4 then
             lume.remove(WayPoints, waypoint)
         end
     end
@@ -1088,7 +1072,7 @@ end
 function DrawWayPoints()
     for _, waypoint in ipairs(WayPoints) do
         love.graphics.setColor(waypoint.color[1], waypoint.color[2], waypoint.color[3], math.random() / 2 + .5)
-        love.graphics.circle("fill", waypoint.x + Jitter(1), waypoint.y + Jitter(1), waypoint.radius)
+        love.graphics.circle("fill", waypoint.x + zutil.jitter(1), waypoint.y + zutil.jitter(1), waypoint.radius)
     end
 end
 function DrawWayPointArrow()
@@ -1097,7 +1081,7 @@ function DrawWayPointArrow()
     local closest
     local closestDistance = math.huge
     for _, waypoint in ipairs(WayPoints) do
-        local distance = Distance(Player.centerX, Player.centerY, waypoint.x, waypoint.y)
+        local distance = zutil.distance(Player.centerX, Player.centerY, waypoint.x, waypoint.y)
         if distance < closestDistance then
             closestDistance = distance
             closest = waypoint
@@ -1108,9 +1092,9 @@ function DrawWayPointArrow()
 end
 
 function DrawArrowTowards(x, y, color, size, maxDistance, waypoint)
-    local distance = Distance(Player.centerX, Player.centerY, x, y)
-    local ratio = Clamp(1 - distance / maxDistance, 0.1, 1)
-    local angle = AngleBetween(Player.centerX, Player.centerY, x, y)
+    local distance = zutil.distance(Player.centerX, Player.centerY, x, y)
+    local ratio = zutil.clamp(1 - distance / maxDistance, 0.1, 1)
+    local angle = zutil.angleBetween(Player.centerX, Player.centerY, x, y)
     local points = {
         Player.x + math.sin(angle - math.rad(20 * size * ratio)) * 80, Player.y + math.cos(angle - math.rad(20 * size * ratio)) * 80,
         Player.x + math.sin(angle) * 100,               Player.y + math.cos(angle) * 100,
@@ -1150,11 +1134,11 @@ function GuardianAngelGlide()
 end
 
 function UpdateEffectsOfPlayerSelfDestruct()
-    Player.zoom = Player.baseZoom + 0.2 * EaseInExpo(Player.selfDestruct.current / Player.selfDestruct.max)
+    Player.zoom = Player.baseZoom + 0.2 * zutil.easeInExpo(Player.selfDestruct.current / Player.selfDestruct.max)
 
     if Player.selfDestruct.current > 0 then
         local ratio = Player.selfDestruct.current / Player.selfDestruct.max
-        PlaySFX(SFX.selfDestruct, ratio * 0.5, math.random() * ratio + ratio * 2)
+        zutil.playsfx(SFX.selfDestruct, ratio * 0.5, math.random() * ratio + ratio * 2)
         ShakeIntensity = ratio * 10
     end
 end

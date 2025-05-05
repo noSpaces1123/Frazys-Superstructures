@@ -63,8 +63,8 @@ function SpawnTurrets(playerSafeArea)
 
     for _, turret in ipairs(Turrets) do
         for _, obj in ipairs(Objects) do
-            if Touching(turret.x, turret.y, 0, 0, obj.x, obj.y, obj.width, obj.height) or
-            Touching(turret.x, turret.y, 0, 0, -playerSafeArea, Boundary.y + Boundary.height - playerSafeArea, playerSafeArea * 2, playerSafeArea * 2) then
+            if zutil.touching(turret.x, turret.y, 0, 0, obj.x, obj.y, obj.width, obj.height) or
+            zutil.touching(turret.x, turret.y, 0, 0, -playerSafeArea, Boundary.y + Boundary.height - playerSafeArea, playerSafeArea * 2, playerSafeArea * 2) then
                 lume.remove(Turrets, turret)
             end
         end
@@ -107,7 +107,7 @@ function UpdateTurrets()
                 turret.mood = lume.weightedchoice(TurretGlobalData.moodPalette)
             end
 
-            local distance = Distance(turret.x, turret.y, Player.centerX, Player.centerY)
+            local distance = zutil.distance(turret.x, turret.y, Player.centerX, Player.centerY)
 
             local before = turret.seesPlayer
             turret.seesPlayer = distance <= turret.viewRadius and not Player.invisible
@@ -141,10 +141,10 @@ function UpdateTurrets()
             if not Player.respawnWait.dead and turret.seesPlayer and not NextLevelAnimation.running and GameState == "game" then
                 if not before and turret.seesPlayer then
                     if turret.mood == "peaceful" then
-                        if math.random() < .6 then    PlaySFX(SFX.heart, .12, math.random()/10+.95)    end
+                        if math.random() < .6 then    zutil.playsfx(SFX.heart, .12, math.random()/10+.95)    end
                         NewMessage("<3", turret.x, turret.y - TurretGlobalData.headRadius - 40, {1,25/255,240/255}, 170, Fonts.medium)
                     else
-                        PlaySFX(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
+                        zutil.playsfx(SFX.seesPlayer, 0.2, turret.fireRate.max / TurretGlobalData.fireInterval.min + 0.5)
                     end
                 end
 
@@ -152,34 +152,34 @@ function UpdateTurrets()
 
                 turret.discovered = true
 
-                turret.searchingAngle = math.deg(AngleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
+                turret.searchingAngle = math.deg(zutil.angleBetween(turret.x, turret.y, Player.centerX, Player.centerY))
                 turret.objectiveSearchingAngle = turret.searchingAngle
 
                 if turret.mood ~= "peaceful" then
-                    local angle = AngleBetween(turret.x, turret.y, Player.x, Player.y) + math.rad(math.random(turret.inaccuracy) * (lume.randomchoice({true,false}) and 1 or -1))
+                    local angle = zutil.angleBetween(turret.x, turret.y, Player.x, Player.y) + math.rad(math.random(turret.inaccuracy) * (lume.randomchoice({true,false}) and 1 or -1))
 
                     turret.fireRate.current = turret.fireRate.current + 1 * GlobalDT / (distance <= Player.destroyingTurretFireRateRangeDiminishment and 1.5 or 1)
                     if turret.fireRate.current >= turret.fireRate.max then
                         if turret.type == "normal" then
-                            PlaySFX(SFX.shoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
+                            zutil.playsfx(SFX.shoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
                             turret.fireRate.current = 0
                             FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed, 1)
                         elseif turret.type == "laser" then
-                            PlaySFX(SFX.jump, .1, .6)
+                            zutil.playsfx(SFX.jump, .1, .6)
                             IncreasePlayerTemperature(2.5)
                             table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*(Player.temperature.current/Player.temperature.max)*4+2, {1,.5,0,math.random()/2+.5}, 1, math.random(360), 0.02, 300))
                         elseif turret.type == "drag" then
                             turret.fireRate.current = 0
-                            PlaySFX(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
+                            zutil.playsfx(SFX.drag, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5)
                             DragPlayerTowards(turret.x, turret.y, 10)
                         elseif turret.type == "push" then
-                            if not SFX.push:isPlaying() then PlaySFX(SFX.push, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5) end
+                            if not SFX.push:isPlaying() then zutil.playsfx(SFX.push, .05, turret.fireRate.max / TurretGlobalData.fireInterval.min / 2 + 0.5) end
 
                             DragPlayerTowards(turret.x, turret.y, -0.8 * GlobalDT)
 
                             table.insert(Particles, NewParticle(Player.x+Player.width/2, Player.y+Player.height/2, math.random()*3+2, {1,0,.7,math.random()/2+.5}, 2, math.random(360), 0, 300,
                             function (self)
-                                self.degrees = self.degrees + Jitter(60)
+                                self.degrees = self.degrees + zutil.jitter(60)
                                 if self.speed > 0 then
                                     self.speed = self.speed - 0.02 * GlobalDT
                                     if self.speed <= 0 then
@@ -188,7 +188,7 @@ function UpdateTurrets()
                                 end
                             end))
                         elseif turret.type == "prime" then
-                            PlaySFX(SFX.primeShoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
+                            zutil.playsfx(SFX.primeShoot, .2, turret.fireRate.max / TurretGlobalData.fireInterval.min * 1.5 + 0.5)
                             turret.fireRate.current = 0
                             FireBullet(turret.x, turret.y, angle, TurretGlobalData.bulletSpeed*1.4, 0.6, true)
                         end
@@ -218,7 +218,7 @@ function UpdateTurrets()
             if turret.warble.current >= turret.warble.max then
                 turret.warble.current = 0
                 turret.warble.max = math.random(TurretGlobalData.warble.min, TurretGlobalData.warble.max)
-                PlaySFX(lume.randomchoice(SFX.warble), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
+                zutil.playsfx(lume.randomchoice(SFX.warble), (1 - zutil.clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, math.random() / 5 + 0.4)
                 NewMessage("~", turret.x, turret.y - TurretGlobalData.headRadius - 40, {1,1,1}, 100, Fonts.medium)
             end
 
@@ -274,7 +274,7 @@ function DrawTurrets()
         local x, y = turret.x, turret.y
         if turret.mood == "angry" then
             local jitter = 8
-            x, y = x + Jitter(jitter), y + Jitter(jitter)
+            x, y = x + zutil.jitter(jitter), y + zutil.jitter(jitter)
         end
 
         love.graphics.circle("fill", x, y, TurretGlobalData.headRadius * (Minimap.showing and 2 or 1), 100)
@@ -298,7 +298,7 @@ function DrawTurrets()
             love.graphics.setColor(r, g, b, (turret.mood == "peaceful" and alpha or turret.fireRate.current / turret.fireRate.max))
 
             local drawLine = function (amplitude)
-                love.graphics.line(turret.x, turret.y, Player.centerX + Jitter(amplitude), Player.centerY + Jitter(amplitude))
+                love.graphics.line(turret.x, turret.y, Player.centerX + zutil.jitter(amplitude), Player.centerY + zutil.jitter(amplitude))
             end
 
             if turret.type == "push" then
@@ -324,7 +324,7 @@ function DisplayTurretInfo()
     for turretIndex, turret in ipairs(Turrets) do
         if not turret.render then goto continue end
         local mx, my = love.graphics.inverseTransformPoint(love.mouse.getX(), love.mouse.getY())
-        if Distance(turret.x, turret.y, mx, my) <= TurretGlobalData.readingsDistance then
+        if zutil.distance(turret.x, turret.y, mx, my) <= TurretGlobalData.readingsDistance then
             love.graphics.setColor(0,1,0)
             love.graphics.setLineWidth(2)
             love.graphics.circle("line", turret.x, turret.y, turret.viewRadius)
@@ -341,11 +341,11 @@ function ExplodeTurret(turret)
     end
 
     lume.remove(Turrets, turret)
-    PlaySFX(SFX.smash, 0.5, 1.5)
+    zutil.playsfx(SFX.smash, 0.5, 1.5)
 end
 function IdentifyIfTurretIsAThreat(turret)
-    if turret.fireRate.max <= Lerp(TurretGlobalData.fireInterval.min, TurretGlobalData.fireInterval.max, 1/4) and
-    ToMeters(Distance(turret.x, turret.y, Player.centerX, Player.centerY)) <= 5 then
+    if turret.fireRate.max <= zutil.lerp(TurretGlobalData.fireInterval.min, TurretGlobalData.fireInterval.max, 1/4) and
+    ToMeters(zutil.distance(turret.x, turret.y, Player.centerX, Player.centerY)) <= 5 then
         return true
     end
 
@@ -396,11 +396,11 @@ function FireBullet(x, y, angle, speed, size, homing)
 end
 function UpdateBullets()
     for _, self in ipairs(Bullets) do
-        local distanceToPlayer = Distance(Player.centerX, Player.centerY, self.x, self.y)
-        local multiplier = Lerp(0.3, 1, Clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
+        local distanceToPlayer = zutil.distance(Player.centerX, Player.centerY, self.x, self.y)
+        local multiplier = zutil.lerp(0.3, 1, zutil.clamp(distanceToPlayer / Player.instinctOfTheBulletJumperDistance, 0, 1))
 
         if self.homing and not Player.respawnWait.dead then
-            local targetAngle = AngleBetween(self.x, self.y, Player.centerX, Player.centerY)
+            local targetAngle = zutil.angleBetween(self.x, self.y, Player.centerX, Player.centerY)
 
             if self.angle < targetAngle then
                 self.angle = self.angle + TurretGlobalData.bulletTurnSpeed * GlobalDT
@@ -428,7 +428,7 @@ function UpdateBullets()
             self.radius = TurretGlobalData.bulletRadius * ratio
         end
 
-        if not Player.respawnWait.dead and Distance(self.x, self.y, Player.centerX, Player.centerY) <= Player.width / 2 + TurretGlobalData.bulletRadius * self.size then
+        if not Player.respawnWait.dead and zutil.distance(self.x, self.y, Player.centerX, Player.centerY) <= Player.width / 2 + TurretGlobalData.bulletRadius * self.size then
             KillPlayer()
         end
 
@@ -452,7 +452,7 @@ function DrawBullets()
 
         local maxdistance, checks = 1300, 20
         for i = 0, maxdistance, maxdistance / checks do
-            if Distance(Player.centerX, Player.centerY,
+            if zutil.distance(Player.centerX, Player.centerY,
             self.x + math.sin(self.angle) * i, self.y + math.cos(self.angle) * i) <= Player.width / 2 + self.radius + maxdistance/checks * 2 then
                 self.warningProgression = self.warningProgression + .1 * GlobalDT
                 if self.warningProgression > 1 then
@@ -468,6 +468,6 @@ function DrawBullets()
 
         love.graphics.setColor(color)
         love.graphics.setLineWidth(3)
-        love.graphics.circle("line", self.x, self.y, self.radius * 5 * EaseOutQuint(self.warningProgression) * self.size, 100)
+        love.graphics.circle("line", self.x, self.y, self.radius * 5 * zutil.easeOutQuint(self.warningProgression) * self.size, 100)
     end
 end

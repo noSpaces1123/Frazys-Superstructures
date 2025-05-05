@@ -1,4 +1,4 @@
-Version = "1.6.3"
+Version = "1.6.4"
 
 ChangelogYOffset = 0
 
@@ -7,29 +7,17 @@ Changelog = Version ..
 [[
  Changelog:
 
-    Turrets:
-    - New: Bullet sprites
-    - New: Prime turrets (only in hot weather)
-
-    Bubs:
-    - New: Wygore wisdom
-
     Hooligans:
-    - New: Hooligans will now try to run away when the player is near a checkpoint
-    - New: Hooligans permanently stick to a sticky platform upon contact
+    - New: Hooligan variants: normal, explosive, or swarming
 
-    OTHER:
-    - New: Added voice acting for the player
-    - New: New posters
-    - Change: Windows render distance increased from 10 to 14 meters
-    - Change: Default zoom decreased (more zoomed out)
-    - Fixed: Foggy level shader overlay incorrectly centered on Windows
-    - Fixed: Zoom differences on Windows and iOS
-    - Fixed: Checkpoints not destroying turrets
-    - Fixed: Dialogue overriding each other
-    - Fixed: Player spawning inside the ground floor platform of every level
+    Shrines:
+    - Change: Significantly increased shrine density (increased spawn chances)
+
+    Ambient:
+    - New: Flutters
+
     
-1.6 -> 1.6.2 Changelog:
+1.6 -> 1.6.3 Changelog:
     
     UI:
     - UI changes
@@ -46,7 +34,9 @@ Changelog = Version ..
     Turrets:
     - New: Velocity multiplier when destroying turrets
     - New: Screen shake when destroying turrets
-    - New: 7% of turrets will be have personality trait peaceful or angry
+    - New: 7% of turrets will be have personality trait, either peaceful or angry
+    - New: Bullet sprites
+    - New: Prime turrets (only in hot weather)
     - Change: Decreased velocity multiplier when destroying turrets
     - Removed: Bouncing off turrets when destroying them
     
@@ -69,6 +59,8 @@ Changelog = Version ..
 
     Hooligans:
     - New: 1 in 5 hooligans will run away if you're moving significantly faster than them
+    - New: Hooligans will now try to run away when the player is near a checkpoint
+    - New: Hooligans permanently stick to a sticky platform upon contact
     
     Super jump:
     - New: Added SFX to communicate when a super jump can be used and when your bar is at max
@@ -81,9 +73,18 @@ Changelog = Version ..
     OTHER:
     - New: Quit button in the menu
     - New: Zen mode
+    - New: Added voice acting for the player
+    - New: New posters
     - Change: Changed game icon to resemble a hooligan
     - Change: Decreased input buffer time from 0.17 seconds to 0.08 seconds
+    - Change: Windows render distance increased from 10 to 14 meters
+    - Change: Default zoom decreased (more zoomed out)
     - Removed: Cursor readings (hovering over turrets to see data)
+    - Fixed: Foggy level shader overlay incorrectly centered on Windows
+    - Fixed: Zoom differences on Windows and iOS
+    - Fixed: Checkpoints not destroying turrets
+    - Fixed: Dialogue overriding each other
+    - Fixed: Player spawning inside the ground floor platform of every level
 
 
 1.5 Changelog:

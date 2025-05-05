@@ -7,7 +7,7 @@ function NewButton(text, x, y, width, height, alignMode, lineColor, fillColor, m
         draw = function (self)
             if self.enable(self) then
 
-                local applyFunc = (self.mouseOver and EaseOutQuint or EaseInQuint)
+                local applyFunc = (self.mouseOver and zutil.easeOutQuint or zutil.easeInQuint)
 
                 local amplitude = 20
                 local buttonX = self.x - applyFunc(self.sizeEasing) * amplitude
@@ -38,17 +38,17 @@ function NewButton(text, x, y, width, height, alignMode, lineColor, fillColor, m
         end,
         update = function (self)
             local before = self.mouseOver
-            self.mouseOver = Touching(love.mouse.getX(), love.mouse.getY(), 0, 0, self.x, self.y, self.width, self.height)
+            self.mouseOver = zutil.touching(love.mouse.getX(), love.mouse.getY(), 0, 0, self.x, self.y, self.width, self.height)
 
             if self.enable(self) then
 
                 if not self.grayedOut then
                     if not before and self.mouseOver then
-                        PlaySFX(SFX.hover, 0.6, 1)
+                        zutil.playsfx(SFX.hover, 0.6, 1)
 
-                        self.sizeEasing = EaseInQuint(self.sizeEasing)
+                        self.sizeEasing = zutil.easeInQuint(self.sizeEasing)
                     elseif before and not self.mouseOver then
-                        self.sizeEasing = EaseOutQuint(self.sizeEasing)
+                        self.sizeEasing = zutil.easeOutQuint(self.sizeEasing)
                     end
 
                     local speed = 1/60
@@ -69,7 +69,7 @@ function NewButton(text, x, y, width, height, alignMode, lineColor, fillColor, m
             if self.mouseOver and self.enable() and not ClickedWithMouse and not self.grayedOut then
                 self.func(self)
                 ClickedWithMouse = true
-                PlaySFX(SFX.click, 0.6, 1)
+                zutil.playsfx(SFX.click, 0.6, 1)
             end
         end
     })

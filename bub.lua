@@ -89,7 +89,7 @@ BubGlobalData = {
                         BubSays(lume.randomchoice(self.voiceLines.hitOrStay), bubIndex)
                         ResetBlackjackDeck()
                         BlackjackDeal(2, "player"); BlackjackDeal(2, "dealer")
-                        PlaySFX(SFX.drawCard, 0.2, 1)
+                        zutil.playsfx(SFX.drawCard, 0.2, 1)
                         bub.phase = "player"
                         Blackjack.playerPlaying = true
                         Blackjack.winner = nil
@@ -97,7 +97,7 @@ BubGlobalData = {
                         BubSays(lume.randomchoice(self.voiceLines.hit), bubIndex)
                         local outcome = BlackjackDeal(1, "player")
                         self.wait.current = 30
-                        PlaySFX(SFX.drawCard, 0.2, 1 + (#Player.blackjackCards - 2) / 8)
+                        zutil.playsfx(SFX.drawCard, 0.2, 1 + (#Player.blackjackCards - 2) / 8)
 
                         if outcome == "player bust" or outcome == "player spot-on" then
                             self.wait.current = 30
@@ -105,9 +105,9 @@ BubGlobalData = {
                             BubSays(lume.randomchoice(self.voiceLines.outcomes[CheckBlackjackWinner(true)]), bubIndex) -- player wins or loses
 
                             if outcome == "player bust" then
-                                PlaySFX(SFX.bust, 0.2, 1)
+                                zutil.playsfx(SFX.bust, 0.2, 1)
                             else
-                                PlaySFX(SFX.blackjackSpotOn, 0.2, 1)
+                                zutil.playsfx(SFX.blackjackSpotOn, 0.2, 1)
                             end
                         end
                     elseif event == "stay" then
@@ -120,7 +120,7 @@ BubGlobalData = {
                             self.wait.current = 30
                             bub.phase = "play again"
                             BubSays(lume.randomchoice(self.voiceLines.outcomes[CheckBlackjackWinner(true)]), bubIndex)
-                            PlaySFX(SFX.blackjackSpotOn, 0.2, 1)
+                            zutil.playsfx(SFX.blackjackSpotOn, 0.2, 1)
                         end
                     elseif bub.phase == "dealer's choice" then
                         local outcome
@@ -129,7 +129,7 @@ BubGlobalData = {
                             BlackjackDeal(1, "dealer")
                             outcome = CheckBlackjackWinner(true)
                             self.wait.current = 50
-                            if outcome == "dealer bust" then PlaySFX(SFX.bust, 0.2, 1) end
+                            if outcome == "dealer bust" then zutil.playsfx(SFX.bust, 0.2, 1) end
                         else
                             outcome = CheckBlackjackWinner()
                         end
@@ -173,7 +173,7 @@ BubGlobalData = {
                         table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {1,1,1,math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
                     end
 
-                    PlaySFX(SFX.poof, .4, .5)
+                    zutil.playsfx(SFX.poof, .4, .5)
                 end
             end
         },
@@ -191,7 +191,7 @@ BubGlobalData = {
                     for _ = 1, 40 do
                         table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {self.color[1],self.color[2],self.color[3],math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
                     end
-                    PlaySFX(SFX.poof, .4, .5)
+                    zutil.playsfx(SFX.poof, .4, .5)
 
                     local choices = {}
                     for key, _ in pairs(Weather.types) do
@@ -199,7 +199,7 @@ BubGlobalData = {
                     end
                     Weather.currentType = choices[math.random(#choices)]
 
-                    PlaySFX(SFX.changeWeather, .4, 1)
+                    zutil.playsfx(SFX.changeWeather, .4, 1)
                     SFX.windy:stop()
                     SFX.rainy:stop()
 
@@ -234,7 +234,7 @@ BubGlobalData = {
                     for _ = 1, 40 do
                         table.insert(Particles, NewParticle(bub.x+self.width/2, bub.y+self.height/2, math.random()*10+3, {self.color[1],self.color[2],self.color[3],math.random()/2+.4}, math.random()*3*3, math.random(360), 0.01, math.random(100,200)))
                     end
-                    PlaySFX(SFX.poof, .4, .5)
+                    zutil.playsfx(SFX.poof, .4, .5)
                     Player.bubEngagementIndex = nil
                     bub.says = nil
 
@@ -260,7 +260,7 @@ BubGlobalData = {
 
                     local inaccuracy = 1.5
 
-                    NewWayPoint(pick.x + Jitter(ToPixels(inaccuracy)), pick.y + Jitter(ToPixels(inaccuracy)))
+                    NewWayPoint(pick.x + zutil.jitter(ToPixels(inaccuracy)), pick.y + zutil.jitter(ToPixels(inaccuracy)))
                 end
             end
         },
@@ -275,12 +275,12 @@ function NewBub(x, y, type)
     })
 
     for _, turret in ipairs(Enemies) do
-        if Distance(turret.x, turret.y, x+BubGlobalData.types[type].width/2, y+BubGlobalData.types[type].width/2) <= turret.viewRadius + BubGlobalData.noticeDistance then
+        if zutil.distance(turret.x, turret.y, x+BubGlobalData.types[type].width/2, y+BubGlobalData.types[type].width/2) <= turret.viewRadius + BubGlobalData.noticeDistance then
             lume.remove(Turrets, turret)
         end
     end
     for _, enemy in ipairs(Enemies) do
-        if Distance(enemy.x+enemy.width/2, enemy.y+enemy.width/2, x+BubGlobalData.types[type].width/2, y+BubGlobalData.types[type].width/2) <= enemy.viewRadius + BubGlobalData.noticeDistance then
+        if zutil.distance(enemy.x+enemy.width/2, enemy.y+enemy.width/2, x+BubGlobalData.types[type].width/2, y+BubGlobalData.types[type].width/2) <= enemy.viewRadius + BubGlobalData.noticeDistance then
             lume.remove(Enemies, enemy)
         end
     end
@@ -303,7 +303,7 @@ function SpawnBubs()
         NewBub(x, y, bubType)
 
         for _, obj in ipairs(Objects) do
-            if Touching(obj.x, obj.y, obj.width, obj.height, x, y, bubData.width, bubData.height) then
+            if zutil.touching(obj.x, obj.y, obj.width, obj.height, x, y, bubData.width, bubData.height) then
                 lume.remove(Objects, obj)
             end
         end
@@ -320,7 +320,7 @@ function UpdateBubs()
         if bub.disabled then goto continue end
 
         local bubData = BubGlobalData.types[bub.type]
-        local distanceToPlayer = Distance(Player.centerX, Player.centerY, bub.x + bubData.width / 2, bub.y + bubData.height / 2)
+        local distanceToPlayer = zutil.distance(Player.centerX, Player.centerY, bub.x + bubData.width / 2, bub.y + bubData.height / 2)
 
         if distanceToPlayer > Player.renderDistance then goto continue end
 
@@ -351,7 +351,7 @@ function DrawBubs()
     for bubIndex, bub in ipairs(Bubs) do
         if bub.disabled then goto continue end
 
-        local distance = Distance(bub.x, bub.y, Player.centerX, Player.centerY)
+        local distance = zutil.distance(bub.x, bub.y, Player.centerX, Player.centerY)
         local bubData = BubGlobalData.types[bub.type]
         if distance <= Player.renderDistance then
             love.graphics.setColor(bubData.color)
@@ -364,7 +364,7 @@ function DrawBubs()
             end
 
             local multiply = bubData.width / 6
-            local angle = AngleBetween(bub.x + bubData.width / 2, bub.y + bubData.height / 2, Player.centerX, Player.centerY)
+            local angle = zutil.angleBetween(bub.x + bubData.width / 2, bub.y + bubData.height / 2, Player.centerX, Player.centerY)
             local eyeX, eyeY = bub.x + bubData.width / 2 + math.sin(angle) * multiply, bub.y + bubData.height / 2 + math.cos(angle) * multiply
             local eyeRadius = bubData.width * 0.3
 
@@ -391,7 +391,7 @@ end
 
 function BubSays(text, bubIndex)
     Bubs[bubIndex].says = { text = text, duration = 1000 }
-    PlaySFX(SFX.bubSpeak, 0.6, math.random()/10+.95)
+    zutil.playsfx(SFX.bubSpeak, 0.6, math.random()/10+.95)
 end
 function UpdateBubDialogue()
     for _, bub in ipairs(Bubs) do
@@ -413,7 +413,7 @@ function ResetBlackjackDeck()
     Blackjack.cards = {}
     for index, fileName in ipairs(love.filesystem.getDirectoryItems("assets/sprites/blackjack")) do
         if index == 1 or fileName == "unknown.png" then goto continue end
-        table.insert(Blackjack.cards, { sprite = love.graphics.newImage("assets/sprites/blackjack/" .. fileName, {dpiscale=10}), worth = Clamp(tonumber(lume.split(lume.split(fileName, " ")[2], ".")[1]), 1, 10), suit = lume.split(fileName, " ")[1] })
+        table.insert(Blackjack.cards, { sprite = love.graphics.newImage("assets/sprites/blackjack/" .. fileName, {dpiscale=10}), worth = zutil.clamp(tonumber(lume.split(lume.split(fileName, " ")[2], ".")[1]), 1, 10), suit = lume.split(fileName, " ")[1] })
         ::continue::
     end
     Blackjack.unknownSprite = love.graphics.newImage("assets/sprites/blackjack/unknown.png", {dpiscale=10})

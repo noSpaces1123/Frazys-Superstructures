@@ -12,7 +12,8 @@ function SaveData()
         playerSkill = { turretsDestroyed = PlayerSkill.turretsDestroyed, deaths = PlayerSkill.deaths, greatestBulletPresence = PlayerSkill.greatestBulletPresence, enemiesKilled = PlayerSkill.enemiesKilled },
         wayPoints = WayPoints, playerPerks = PlayerPerks, timeOnThisLevel = TimeOnThisLevel, dialogueDone = dialogueDone, totalTime = TotalTime, deathPositions = DeathPositions,
         enemies = Enemies, bestGameCompletionTime = BestGameCompletionTime, settings = Settings, playerCanMove = PlayerCanMove, descensionLevels = Descending.onLevels, playerUpgrades = PlayerUpgrades,
-        weatherType = Weather.currentType, weatherStrength = Weather.strength, weatherWindEvent = Weather.windEvents, plinks = Plinks, descending = Descending.doingSo,
+        weatherType = Weather.currentType, weatherStrength = Weather.strength, weatherWindEvent = Weather.windEvents, plinks = Plinks, descending = Descending.doingSo, gnatClouds = GnatClouds,
+        flutters = Flutters
     }
 
     love.filesystem.write("data.csv", lume.serialize(data))
@@ -45,6 +46,8 @@ function LoadData()
     Descending.onLevels = (data.descensionLevels and data.descensionLevels or PickDescensionLevels())
     Plinks = (data.plinks and data.plinks or 0)
     Descending.doingSo = (data.descending and data.descending or false)
+    GnatClouds = (data.gnatClouds and data.gnatClouds or {})
+    Flutters = (data.flutters and data.flutters or {})
 
     if data.playerUpgrades then
         PlayerUpgrades = data.playerUpgrades

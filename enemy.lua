@@ -21,6 +21,8 @@ EnemyGlobalData = {
     },
 }
 
+EnemyGenerationPalette = { normal = 20, explosive = 4, swarm = 1 }
+
 
 
 function StartEnemyUpdateThread()
@@ -65,19 +67,40 @@ end
 function NewEnemy(x, y)
     local m = (Weather.currentType == "foggy" and Weather.types.foggy.enemySizeMultiplier or 1)
 
-    table.insert(Enemies, {
-        x = x, y = y, xvelocity = 0, yvelocity = 0,
-        width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max) * m, speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide,
-        viewRadius = math.random(EnemyGlobalData.viewRadius.min, EnemyGlobalData.viewRadius.max), seesPlayer = false,
-        warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) },
-        rotationRadians = math.rad(math.random(360)), rotationVelocity = 0,
-        fearful = math.random() < 1/5
-    })
+    local type = lume.weightedchoice(EnemyGenerationPalette)
+
+    local create = function ()
+        table.insert(Enemies, {
+            x = x, y = y, xvelocity = 0, yvelocity = 0,
+            width = math.random(EnemyGlobalData.width.min, EnemyGlobalData.width.max) * m, speed = math.random(EnemyGlobalData.speed.min, EnemyGlobalData.speed.max) / EnemyGlobalData.speed.divide,
+            viewRadius = math.random(EnemyGlobalData.viewRadius.min, EnemyGlobalData.viewRadius.max), seesPlayer = false,
+            warble = { current = 0, max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max) },
+            rotationRadians = math.rad(math.random(360)), rotationVelocity = 0,
+            fearful = math.random() < 1/5,
+            type = type,
+        })
+    end
+
+    if type == "swarm" then
+        type = "normal"
+
+        m = m * .4
+
+        local amp = 10
+
+        for _ = 1, 8 do
+            x, y = x + zutil.jitter(amp), y + zutil.jitter(amp)
+
+            create()
+        end
+    else
+        create()
+    end
 end
 
 function DrawEnemies()
     for _, enemy in ipairs(Enemies) do
-        if not enemy.dead and (enemy.discovered and ((not Minimap.showing and Distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) or Zen.doingSo) then
+        if not enemy.dead and (enemy.discovered and ((not Minimap.showing and zutil.distance(Player.centerX, Player.centerY, enemy.x, enemy.y) <= Player.renderDistance) or Minimap.showing) or Zen.doingSo) then
             if not enemy.shortCircuit then enemy.shortCircuit = { current = 0, max = 0, running = false } end
 
             local fillColor = { 1, (1 - enemy.speed / (EnemyGlobalData.speed.max / EnemyGlobalData.speed.divide)) * .3 ,0 }
@@ -96,15 +119,18 @@ function DrawEnemies()
             if not enemy.rotationRadians then enemy.rotationRadians = math.rad(math.random(360)) end
             love.graphics.rotate(enemy.rotationRadians)
 
+            local fillX, fillY = -enemy.width/2, -enemy.width/2
+            local amplitude = 5
+            if enemy.type == "explosive" then fillX, fillY = fillX + zutil.jitter(amplitude), fillY + zutil.jitter(amplitude) end
             love.graphics.setColor(fillColor)
-            love.graphics.rectangle("fill", -enemy.width/2, -enemy.width/2, enemy.width, enemy.width)
+            love.graphics.rectangle("fill", fillX, fillY, enemy.width, enemy.width)
 
             love.graphics.pop()
 
             local r,g,b = love.graphics.getColor()
             love.graphics.setColor(r,g,b,.3)
 
-            local boxSpacing = 2 + Jitter(3)
+            local boxSpacing = 2 + zutil.jitter(3)
             love.graphics.setLineWidth(2)
             love.graphics.rectangle("line", enemy.x - boxSpacing, enemy.y - boxSpacing, enemy.width + boxSpacing * 2, enemy.width + boxSpacing * 2)
 
@@ -116,13 +142,13 @@ function DrawEnemies()
 
 
             local multiply = enemy.width / 6
-            local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY)
+            local angle = zutil.angleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY)
             local eyeX, eyeY = enemy.x + enemy.width / 2 + math.sin(angle) * multiply, enemy.y + enemy.width / 2 + math.cos(angle) * multiply
-            local eyeWidth = enemy.width * 0.5
+            local eyeWidth = enemy.width * 0.5 * (enemy.type == "explosive" and .5 or 1)
 
             if Weather.currentType == "foggy" then
-                eyeX = eyeX + Jitter(3)
-                eyeY = eyeY + Jitter(3)
+                eyeX = eyeX + zutil.jitter(3)
+                eyeY = eyeY + zutil.jitter(3)
             end
 
             if not enemy.seesPlayer then
@@ -153,23 +179,23 @@ function UpdateEnemies()
 
             local distance
             if Zen.doingSo then
-                distance = Distance(Zen.camera.x, Zen.camera.y, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+                distance = zutil.distance(Zen.camera.x, Zen.camera.y, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
             else
-                distance = Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
+                distance = zutil.distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2)
             end
 
             local before = enemy.seesPlayer
             enemy.seesPlayer = distance <= enemy.viewRadius and not Player.invisible
             if enemy.seesPlayer and not before then
                 local ratio = 1 - (enemy.width - EnemyGlobalData.width.min) / (EnemyGlobalData.width.max - EnemyGlobalData.width.min)
-                PlaySFX(SFX.enemySeesPlayer, 0.6, Clamp(ratio * 1 + 1, 0.1, math.huge))
+                zutil.playsfx(SFX.enemySeesPlayer, 0.6, zutil.clamp(ratio * 1 + 1, 0.1, math.huge))
                 if math.random() < 0.2 then
                     enemy.warble.current = enemy.warble.max
                 end
             end
 
             if enemy.render or Zen.doingSo then
-                local enemyNetSpeed = Pythag(enemy.xvelocity, enemy.yvelocity)
+                local enemyNetSpeed = zutil.pythag(enemy.xvelocity, enemy.yvelocity)
 
                 enemy.xvelocity = ApplyWind(enemy.xvelocity)
 
@@ -180,7 +206,7 @@ function UpdateEnemies()
                         enemy.discovered = true
 
                         if not enemy.stuck then
-                            local angle = AngleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(Jitter(20))
+                            local angle = zutil.angleBetween(enemy.x + enemy.width / 2, enemy.y + enemy.width / 2, Player.centerX, Player.centerY) + math.rad(zutil.jitter(20))
 
                             if (enemy.fearful and Player.netSpeed - 10 > enemyNetSpeed) or Player.closeToCheckpoint then
                                 angle = angle + math.rad(180)
@@ -211,7 +237,7 @@ function UpdateEnemies()
                 end
 
                 if not Player.respawnWait.dead and not NextLevelAnimation.running then
-                    if Touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
+                    if zutil.touching(Player.x, Player.y, Player.width, Player.height, enemy.x, enemy.y, enemy.width, enemy.width) then
                         if Player.netSpeed / (Weather.currentType == "foggy" and 4 or 1) + Player.enemyKillForgiveness >= enemyNetSpeed then
                             ExplodeEnemy(enemy)
                             PlayDialogue(math.random(#Dialogue.eventual.killEnemy), "killEnemy")
@@ -224,7 +250,7 @@ function UpdateEnemies()
                     end
                 end
 
-                if enemy.xvelocity ~= 0 or enemy.yvelocity ~= 0 then
+                if (enemy.xvelocity ~= 0 or enemy.yvelocity ~= 0) and math.random() < .3 then
                     table.insert(Particles,
                     NewParticle(math.random(enemy.x + enemy.width / 4, enemy.x + enemy.width - enemy.width / 4), math.random(enemy.y + enemy.width / 4, enemy.y + enemy.width - enemy.width / 4), 4, {1,0,0,0.4}, 0, 0, 0, 30))
                 end
@@ -236,7 +262,7 @@ function UpdateEnemies()
                 if enemy.warble.current >= enemy.warble.max then
                     enemy.warble.current = 0
                     enemy.warble.max = math.random(EnemyGlobalData.warble.min, EnemyGlobalData.warble.max)
-                    PlaySFX(lume.randomchoice(SFX.enemySpeak), (1 - Clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, Clamp(math.random() / 5 + 0.4 - (Weather.currentType == "foggy" and 0.27 or 0), 0.1, math.huge))
+                    zutil.playsfx(lume.randomchoice(SFX.enemySpeak), (1 - zutil.clamp(distance, 0, maxWarbleHearing) / maxWarbleHearing) * 0.1, zutil.clamp(math.random() / 5 + 0.4 - (Weather.currentType == "foggy" and 0.27 or 0), 0.1, math.huge))
                     NewMessage(lume.randomchoice(EnemyGlobalData.voiceLines), enemy.width / 2, -50, {1,0,0}, 100, Fonts.medium, index)
                 end
             end
@@ -248,7 +274,7 @@ function UpdateEnemies()
                     enemy.shortCircuit.max = math.random(EnemyGlobalData.shortCircuitTime.min, EnemyGlobalData.shortCircuitTime.max)
 
                     local maxHearingDistance = ToPixels(5)
-                    PlaySFX(lume.randomchoice(SFX.shortCircuit), .2 * Clamp(1 - distance / maxHearingDistance, 0, 1), math.random()/20+.9)
+                    zutil.playsfx(lume.randomchoice(SFX.shortCircuit), .2 * zutil.clamp(1 - distance / maxHearingDistance, 0, 1), math.random()/20+.9)
 
                     for _ = 1, 8 do
                         local degrees = math.random(360)
@@ -257,7 +283,7 @@ function UpdateEnemies()
                         local decay = math.random(400, 600)
                         table.insert(Particles, NewParticle(enemy.x+enemy.width/2, enemy.y+enemy.width/2, radius, {1,0,0,math.random()/2+.5}, speed, degrees, 0.01, decay,
                         function (self)
-                            self.degrees = self.degrees + Jitter(60)
+                            self.degrees = self.degrees + zutil.jitter(60)
                             if self.speed > 0 then
                                 self.speed = self.speed - 0.02 * GlobalDT
                                 if self.speed <= 0 then
@@ -301,7 +327,7 @@ function DoEnemyCollisions(enemyIndex)
                 }
 
                 for index, side in ipairs(sides) do
-                    local distance = Distance(side.x, side.y, enemyCenter.x, enemyCenter.y)
+                    local distance = zutil.distance(side.x, side.y, enemyCenter.x, enemyCenter.y)
                     if distance < closestDistance then
                         closestDistance = distance
                         closestSide = index
@@ -345,11 +371,11 @@ function DoEnemyCollisions(enemyIndex)
             if closestSide ~= nil then
                 if not obj.impenetrable and Weather.currentType == "foggy" and Enemies[enemyIndex].seesPlayer and lume.randomchoice({true,false}) then
                     local maxHearingDistance = ToPixels(6)
-                    local distance = Distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
-                    local ratio = Clamp(1 - distance / maxHearingDistance, 0, 1)
+                    local distance = zutil.distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
+                    local ratio = zutil.clamp(1 - distance / maxHearingDistance, 0, 1)
 
                     SmashObject(obj)
-                    PlaySFX(lume.randomchoice(SFX.foggyEnemySmash), .6 * ratio, math.random() / 5 + .9)
+                    zutil.playsfx(lume.randomchoice(SFX.foggyEnemySmash), .6 * ratio, math.random() / 5 + .9)
                     ShakeIntensity = 40 * ratio
                     Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity = 0, 0
 
@@ -362,11 +388,21 @@ function DoEnemyCollisions(enemyIndex)
                     Enemies[enemyIndex].rotationVelocity, Enemies[enemyIndex].rotationRadians = 0, 0
 
                     if not before then
-                        PlaySFX(SFX.stick, .3, 1.5)
+                        zutil.playsfx(SFX.stick, .3, 1.5)
                     end
                 else
                     Enemies[enemyIndex].rotationVelocity = Enemies[enemyIndex].rotationVelocity + CalculateRotationVelocity(closestSide, Enemies[enemyIndex].xvelocity, Enemies[enemyIndex].yvelocity)
                     Enemies[enemyIndex].stuck = false
+                end
+
+                if Enemies[enemyIndex].type == "explosive" and not obj.impenetrable then
+                    local maxHearingDistance = ToPixels(6)
+                    local distance = zutil.distance(Player.centerX, Player.centerY, Enemies[enemyIndex].x+Enemies[enemyIndex].width/2, Enemies[enemyIndex].y+Enemies[enemyIndex].width/2)
+                    local ratio = zutil.clamp(1 - distance / maxHearingDistance, 0, 1)
+                    ShakeIntensity = 40 * ratio
+                    SmashObject(obj)
+                    ExplodeEnemy(Enemies[enemyIndex])
+                    StartSlowMo(false, false, false)
                 end
             end
 
@@ -380,7 +416,7 @@ function DoEnemyCollisions(enemyIndex)
 end
 
 function DetectIfEnemyDiesToSpeed(enemy)
-    if math.abs(Pythag(enemy.xvelocity, enemy.yvelocity)) >= EnemyGlobalData.minSpeedAgainstWallToDie then
+    if math.abs(zutil.pythag(enemy.xvelocity, enemy.yvelocity)) >= EnemyGlobalData.minSpeedAgainstWallToDie then
         ExplodeEnemy(enemy)
     end
 end
@@ -445,7 +481,7 @@ function ExplodeEnemy(enemy)
             break
         end
     end
-    PlaySFX(SFX.smash, 0.5, 1.5)
+    zutil.playsfx(SFX.smash, 0.5, 1.5)
 end
 
 function CalculateRotationVelocity(side, xvelocity, yvelocity)

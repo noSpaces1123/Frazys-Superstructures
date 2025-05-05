@@ -1,6 +1,9 @@
 function love.load()
 ---@diagnostic disable-next-line: lowercase-global
     lume = require "lume"
+---@diagnostic disable-next-line: lowercase-global
+    zutil = require "zutil"
+
     require "player"
     require "particle"
     require "data_management"
@@ -11,6 +14,7 @@ function love.load()
     require "weather"
     require "changelog"
     require "dialogue"
+    require "ambient_life"
 
     NameOfTheGame = "Frazy's Superstructures"
 
@@ -193,7 +197,7 @@ function love.load()
         cornerRadius = 3,
         strokeWidth = 4,
         beamStrokeWidth = 50, beamColor = {.06,.06,.06},
-        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000014, shrineDensity = 0.0000000005, bubDensity = 0.000000002,
+        objectsToGenerate = 0, objectDensity = 0.0000022, turretDensity = 0, baseTurretDensity = 0.00000003, checkpointDensity = 0.000000014, shrineDensity = 0.0000000006, bubDensity = 0.000000002,
         groundZeroNotchSpacing = 100, groundZeroNotchLength = 20,
         dangerPulseProgression = { current = 0, max = 500 },
         jumpPlatformStrength = 40,
@@ -261,8 +265,6 @@ function love.load()
         spacingFromEdgesOfObject = 20,
         density = 0.02, -- posters to generate = density x number of objects
     }
-
-    InitialiseWeather()
 
     ShrineGenerationPalette = {
         ["Spirit of the Frozen Trekker"] = 10,
@@ -465,6 +467,7 @@ function love.load()
 
     StartEnemyUpdateThread()
     StartTurretUpdateThread()
+    StartAmbientLifeUpdateThread()
 
     CancelNextThreadSupply = false
 end
@@ -672,6 +675,7 @@ function DrawGameFrame()
     DrawBeams()
     DrawParticles()
     DrawObjects()
+    DrawAmbientLife()
     DrawDeathPositions()
     DrawEnemies()
     DrawLevelGoal()
@@ -715,22 +719,6 @@ function ApplyGravity(object)
     return object.yvelocity + Gravity * GlobalDT
 end
 
-function PlaySFX(sfx, vol, pitch)
-    sfx:stop()
-
-    sfx:setVolume(vol)
-    sfx:setPitch(pitch)
-
-    sfx:play()
-end
-
-function Clamp(x, min, max)
-    if x < min then x = min
-    elseif x > max then x = max
-    end
-    return x
-end
-
 function UpdateShakeIntensity()
     if ShakeIntensity > 0 then
         ShakeIntensity = ShakeIntensity - 1 * GlobalDT
@@ -758,7 +746,7 @@ function DrawObjects()
         local outsideRenderDistance = not obj.render
         if not obj.discovered and GameState == "game" then goto continue end
         if outsideRenderDistance and not obj.discovered and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
-        if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
+        if (GameState == "menu" or GameState == "settings") and obj.y <= zutil.lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
 
         if outsideRenderDistance and Minimap.showing and not obj.discovered then
             love.graphics.setColor(0,0,0,1)
@@ -807,7 +795,7 @@ function DrawObjects()
         local outsideRenderDistance = not obj.render
         if not obj.discovered and GameState == "game" then goto continue end
         if outsideRenderDistance and not obj.discovered and not Minimap.showing and not obj.impenetrable and GameState == "game" then goto continue end
-        if (GameState == "menu" or GameState == "settings") and obj.y <= Lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
+        if (GameState == "menu" or GameState == "settings") and obj.y <= zutil.lerp(Boundary.y, Boundary.y + Boundary.height, 1 - MenuAnimation.objectIntro) then goto continue end
 
         if obj.poster ~= nil then
             if Sprites.posters[obj.poster.type] == nil then
@@ -896,7 +884,7 @@ function GenerateObjects()
         for _ = 1, math.random(1,3) do
             local candidates = {}
             for _, candidate in ipairs(Objects) do
-                if candidate.x == obj.x and candidate.y == obj.y or Distance(obj.x+obj.width/2, obj.y+obj.height/2, candidate.x+candidate.width/2, candidate.y+candidate.height/2) > maxDistance then goto continue end
+                if candidate.x == obj.x and candidate.y == obj.y or zutil.distance(obj.x+obj.width/2, obj.y+obj.height/2, candidate.x+candidate.width/2, candidate.y+candidate.height/2) > maxDistance then goto continue end
 
                 table.insert(candidates, candidate)
 
@@ -923,7 +911,7 @@ function GenerateObjects()
     -- safe area
     local thoseToRemove = {}
     for index, obj in ipairs(Objects) do
-        if Touching(obj.x, obj.y, obj.width, obj.height, -playerSafeArea, Boundary.y + Boundary.height - playerSafeArea, playerSafeArea * 2, playerSafeArea * 2) and
+        if zutil.touching(obj.x, obj.y, obj.width, obj.height, -playerSafeArea, Boundary.y + Boundary.height - playerSafeArea, playerSafeArea * 2, playerSafeArea * 2) and
         not obj.impenetrable then
             table.insert(thoseToRemove, index)
         end
@@ -952,7 +940,7 @@ end
 function GetObjectTypeFromPerlinNoise(x, y)
     local totalObjectTypes = 0; for _, _ in pairs(ObjectTypeData) do totalObjectTypes = totalObjectTypes + 1 end
     local xyDivisor = 13000
-    local noiseValue = Clamp(love.math.noise(x / xyDivisor, y / xyDivisor) + Jitter(0.1), 0, 1)
+    local noiseValue = zutil.clamp(love.math.noise(x / xyDivisor, y / xyDivisor) + zutil.jitter(0.1), 0, 1)
 
     for index, value in ipairs(ObjectGenerationPaletteAsNoiseConstraints) do
         local lastobj = ObjectGenerationPaletteAsNoiseConstraints[index-1]
@@ -995,14 +983,14 @@ function DiscoverAndRenderDiscoverables()
         local screenX, screenY = love.graphics.inverseTransformPoint(0, 0)
         love.graphics.pop()
 
-        if Touching(objX, objY, obj.width, obj.height, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
+        if zutil.touching(objX, objY, obj.width, obj.height, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
             obj.discovered = true
             obj.render = true
         else
             obj.render = false
         end
 
-        obj.withinRenderDistance = Distance(obj.x+obj.width/2, obj.y+obj.height/2, Player.centerX, Player.centerY) <= Player.renderDistance
+        obj.withinRenderDistance = zutil.distance(obj.x+obj.width/2, obj.y+obj.height/2, Player.centerX, Player.centerY) <= Player.renderDistance
     end
 
     for _, turret in ipairs(Turrets) do
@@ -1016,7 +1004,7 @@ function DiscoverAndRenderDiscoverables()
         local screenX, screenY = love.graphics.inverseTransformPoint(0, 0)
         love.graphics.pop()
 
-        if Touching(turretX, turretY, TurretGlobalData.headRadius*2, TurretGlobalData.headRadius*2, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
+        if zutil.touching(turretX, turretY, TurretGlobalData.headRadius*2, TurretGlobalData.headRadius*2, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
             turret.discovered = true
         end
     end
@@ -1032,7 +1020,7 @@ function DiscoverAndRenderDiscoverables()
         local screenX, screenY = love.graphics.inverseTransformPoint(0, 0)
         love.graphics.pop()
 
-        if Touching(turretX, turretY, enemy.width, enemy.width, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
+        if zutil.touching(turretX, turretY, enemy.width, enemy.width, screenX, screenY, love.graphics.getWidth(), love.graphics.getHeight()) then
             enemy.discovered = true
         end
     end
@@ -1074,10 +1062,6 @@ function UpdateDangerPulseProgression()
     end
 end
 
-function Touching(x1, y1, w1, h1, x2, y2, w2, h2)
-    return x1 + w1 >= x2 and y1 + h1 >= y2 and x1 <= x2 + w2 and y1 <= y2 + h2
-end
-
 function CheckIfPlayerHasCompletedLevel()
     if ((Descending.doingSo and Player.y >= Boundary.y + Boundary.height) or (not Descending.doingSo and Player.y <= 0)) then
         NextLevel()
@@ -1104,7 +1088,7 @@ function NextLevel()
             Weather.currentType = "clear"
         end
 
-        PlaySFX(SFX.nextLevel, .4, 1)
+        zutil.playsfx(SFX.nextLevel, .4, 1)
         CorrectBoundaryHeight()
         CorrectEnemyDensity()
         CorrectTurretDensity()
@@ -1119,7 +1103,7 @@ function NextLevel()
             Descending.doingSo = false
             Descending.music:stop()
             if Settings.musicOn then Music:play() end
-            PlaySFX(SFX.descended, 0.5, 1)
+            zutil.playsfx(SFX.descended, 0.5, 1)
         end
 
         if Settings.musicOn and not Music:isPlaying() then
@@ -1155,7 +1139,7 @@ function UpdateNextLevelAnimation()
         if Level >= UpgradeData.startGettingUpgradesOnLevel and Level % UpgradeData.upgradeInterval == 0 then
             OpenUpgradeMenu()
         else
-            PlaySFX(SFX.playerSpawn, 0.5, 1)
+            zutil.playsfx(SFX.playerSpawn, 0.5, 1)
         end
     end
 end
@@ -1163,13 +1147,13 @@ function ApplyNextLevelAnimation()
     if not NextLevelAnimation.running then return end
 
     local ratio = NextLevelAnimation.current / NextLevelAnimation.max
-    local yOff = Lerp(Boundary.y, Player.y, EaseInOutCubic(ratio))
+    local yOff = zutil.lerp(Boundary.y, Player.y, zutil.easeInOutCubic(ratio))
 
     love.graphics.translate(0, -yOff)
 end
 function FinalLevelReached()
     GameState = "complete"
-    PlaySFX(SFX.complete, 0.4, 1)
+    zutil.playsfx(SFX.complete, 0.4, 1)
     GameCompleteFlash = 1
 
     if BestGameCompletionTime == nil or TotalTime > BestGameCompletionTime then
@@ -1272,7 +1256,7 @@ function UpdateHooligmanDialogue()
 
                 Descending.hooligmanCutscene.dialogue.charIndex = Descending.hooligmanCutscene.dialogue.charIndex + 1
 
-                PlaySFX(SFX.hooligmanDialogue, 0.6, math.random()/2+.7)
+                zutil.playsfx(SFX.hooligmanDialogue, 0.6, math.random()/2+.7)
             end
         end
     end
@@ -1295,7 +1279,7 @@ function DrawHooligman()
     if not Descending.hooligmanCutscene.running then return end
 
     local x = Player.x - Descending.hooligmanCutscene.hooligman.width / 2
-    local y = Player.y + EaseInOutCubic(ReverseLerp(0, Descending.hooligmanCutscene.intro.max, Descending.hooligmanCutscene.intro.current)) * 1000 - Descending.hooligmanCutscene.hooligman.width - 1300
+    local y = Player.y + zutil.easeInOutCubic(zutil.reverseLerp(0, Descending.hooligmanCutscene.intro.max, Descending.hooligmanCutscene.intro.current)) * 1000 - Descending.hooligmanCutscene.hooligman.width - 1300
     local width = Descending.hooligmanCutscene.hooligman.width
 
     love.graphics.setColor(1,0,0)
@@ -1303,8 +1287,8 @@ function DrawHooligman()
 
 
     local multiply = width / 6
-    local angle = AngleBetween(x + width / 2, y + width / 2, Player.centerX, Player.centerY)
-    local eyeX, eyeY = x + width / 2 + math.sin(angle) * multiply + Jitter(1), y + width / 2 + math.cos(angle) * multiply + Jitter(1)
+    local angle = zutil.angleBetween(x + width / 2, y + width / 2, Player.centerX, Player.centerY)
+    local eyeX, eyeY = x + width / 2 + math.sin(angle) * multiply + zutil.jitter(1), y + width / 2 + math.cos(angle) * multiply + zutil.jitter(1)
     local eyeWidth = width * 0.5
 
     love.graphics.setColor(0,0,0)
@@ -1423,7 +1407,7 @@ function DrawDisplays()
     love.graphics.printf(text, 0, generalPadding, love.graphics.getWidth() - generalPadding * 2, "center")
 
     -- x location on map
-    local x = ReverseLerp(Boundary.x, Boundary.x + Boundary.width, Player.x) * love.graphics.getWidth()
+    local x = zutil.reverseLerp(Boundary.x, Boundary.x + Boundary.width, Player.x) * love.graphics.getWidth()
     love.graphics.setLineWidth(7)
     love.graphics.setColor(0,1,0,.3)
     love.graphics.line(x, 10, x, 24)
@@ -1447,8 +1431,8 @@ function ToPixels(meters)
 end
 
 function ExtendView()
-    local angle = AngleBetween(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, love.mouse.getX(), love.mouse.getY())
-    local distance = -Distance(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, love.mouse.getX(), love.mouse.getY())
+    local angle = zutil.angleBetween(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, love.mouse.getX(), love.mouse.getY())
+    local distance = -zutil.distance(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2, love.mouse.getX(), love.mouse.getY())
 
     local xTranslate = math.sin(angle) * distance * 1.5
     local yTranslate = math.cos(angle) * distance * 1.5
@@ -1488,24 +1472,11 @@ function UpdateCamLookAhead()
 
         local ratio = CamLookAhead.easing.current / CamLookAhead.easing.max
         CamLookAhead.xOff, CamLookAhead.yOff =
-        Lerp(CamLookAhead.easing.origin.x, CamLookAhead.easing.dest.x, EaseOutQuint(ratio)), Lerp(CamLookAhead.easing.origin.y, CamLookAhead.easing.dest.y, EaseOutQuint(ratio))
+        zutil.lerp(CamLookAhead.easing.origin.x, CamLookAhead.easing.dest.x, zutil.easeOutQuint(ratio)), zutil.lerp(CamLookAhead.easing.origin.y, CamLookAhead.easing.dest.y, zutil.easeOutQuint(ratio))
     end
 end
 function ApplyCamLookAhead()
     love.graphics.translate(CamLookAhead.xOff, CamLookAhead.yOff)
-end
-
-function EaseOutQuint(x)
-    return 1 - (1 - x)^5
-end
-function EaseInQuint(x)
-    return x^5
-end
-function EaseInExpo(x)
-    return (x == 0 and 0 or 2^(10 * x - 10))
-end
-function EaseInOutCubic(x)
-    return (x < 0.5 and 4 * x^3 or 1 - (-2 * x + 2)^3 / 2)
 end
 
 function SpawnCheckpoints()
@@ -1515,7 +1486,7 @@ function SpawnCheckpoints()
         NewCheckpoint(x, y)
 
         for _, obj in ipairs(Objects) do
-            if Touching(x, y, 0, 0, obj.x, obj.y, obj.width, obj.height) then
+            if zutil.touching(x, y, 0, 0, obj.x, obj.y, obj.width, obj.height) then
                 lume.remove(Objects, obj)
             end
         end
@@ -1585,7 +1556,7 @@ function NewShrine(x, y)
     })
 
     for _, obj in ipairs(Objects) do
-        if Touching(x, y, ShrineGlobalData.width, ShrineGlobalData.width, obj.x, obj.y, obj.width, obj.height) then
+        if zutil.touching(x, y, ShrineGlobalData.width, ShrineGlobalData.width, obj.x, obj.y, obj.width, obj.height) then
             lume.remove(Objects, obj)
         end
     end
@@ -1621,7 +1592,7 @@ function DrawShines()
 
         ::continue::
 
-        if AnalyticsUpgrades["signal radar"] and Distance(Player.centerX, Player.centerY, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
+        if AnalyticsUpgrades["signal radar"] and zutil.distance(Player.centerX, Player.centerY, shrine.x, shrine.y) <= ShrineGlobalData.maxHintDistance then
             DrawArrowTowards(shrine.x, shrine.y, color, 1, ShrineGlobalData.maxHintDistance)
         end
     end
@@ -1633,8 +1604,8 @@ function UpdateShrines()
     end
 
     for _, shrine in ipairs(Shrines) do
-        if Touching(shrine.x, shrine.y, ShrineGlobalData.width, ShrineGlobalData.width, Player.x, Player.y, Player.width, Player.height) then
-            PlaySFX(SFX.shrine, 0.6, math.random()/10+.95)
+        if zutil.touching(shrine.x, shrine.y, ShrineGlobalData.width, ShrineGlobalData.width, Player.x, Player.y, Player.width, Player.height) then
+            zutil.playsfx(SFX.shrine, 0.6, math.random()/10+.95)
 
             local shrineEffect = ShrineGlobalData.types[shrine.effect]
             shrineEffect.func()
@@ -1670,11 +1641,6 @@ function ApplyShrineEffects()
     if PlayerPerks["Essence of the Grasshopper"] then Player.jumpStrength = 30; Player.superJumpStrength = 100 end
 end
 
-function AngleBetween(x1, y1, x2, y2)
----@diagnostic disable-next-line: deprecated
-    return math.atan2(x2 - x1, y2 - y1)
-end
-
 function UpdateSaveInterval()
     if Zen.doingSo then return end
 
@@ -1687,7 +1653,7 @@ end
 
 function DrawBG()
     for _, element in ipairs(BG) do
-        if Distance(Player.centerX, Player.centerY, element.x, element.y) <= Player.renderDistance then
+        if zutil.distance(Player.centerX, Player.centerY, element.x, element.y) <= Player.renderDistance then
             love.graphics.setColor(1,1,1, element.alpha)
             love.graphics.circle("fill", element.x, element.y, element.radius)
         end
@@ -1776,7 +1742,7 @@ end
 function DrawPausedOverlay()
     if Paused or (SlowMo.running and (SlowMo.toPause or SlowMo.toUnpause)) then
         local alpha = 0.2
-        local multiplier = EaseInOutCubic((SlowMo.running and (SlowMo.slowingDown and SlowMo.current or SlowMo.max - SlowMo.current) / SlowMo.max or 1))
+        local multiplier = zutil.easeInOutCubic((SlowMo.running and (SlowMo.slowingDown and SlowMo.current or SlowMo.max - SlowMo.current) / SlowMo.max or 1))
         love.graphics.setColor(0,0,0, multiplier * alpha)
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
@@ -1806,12 +1772,8 @@ end
 function DrawDeathPositions()
     for _, position in ipairs(DeathPositions) do
         love.graphics.setColor(1,0,0,.3)
-        love.graphics.draw(Sprites.cross, position.x - Sprites.cross:getWidth() / 2 + Jitter(3), position.y - Sprites.cross:getHeight() / 2 + Jitter(3))
+        love.graphics.draw(Sprites.cross, position.x - Sprites.cross:getWidth() / 2 + zutil.jitter(3), position.y - Sprites.cross:getHeight() / 2 + zutil.jitter(3))
     end
-end
-
-function Jitter(amplitude)
-    return (math.random()-math.random())*amplitude
 end
 
 function InitialiseMenuButtons()
@@ -1921,7 +1883,7 @@ function InitialiseMenuButtons()
         elseif self.confirmation == 1 and love.keyboard.isDown("lshift") and love.keyboard.isDown(self.key) then
             self.confirmation = nil
             self.text = "Reset Current Run"
-            PlaySFX(SFX.resetRun, 0.1, 1)
+            zutil.playsfx(SFX.resetRun, 0.1, 1)
             ResetGame()
             CorrectBoundaryHeight()
             LoadPlayer()
@@ -1949,7 +1911,7 @@ function UpdateSlowMo()
     if not SlowMo.running then return end
 
     SlowMo.current = SlowMo.current + 1 * GlobalUnaffectedDT
-    TimeMultiplier = EaseInOutCubic((SlowMo.slowingDown and SlowMo.max - SlowMo.current or SlowMo.current) / SlowMo.max)
+    TimeMultiplier = zutil.easeInOutCubic((SlowMo.slowingDown and SlowMo.max - SlowMo.current or SlowMo.current) / SlowMo.max)
     if SlowMo.current >= SlowMo.max then
         SlowMo.running = false
         SlowMo.current = 0
@@ -2065,7 +2027,7 @@ function InitialiseUpgrades()
             ApplyUpgrades()
             SaveData()
 
-            PlaySFX(SFX.upgrade, 0.4, 1)
+            zutil.playsfx(SFX.upgrade, 0.4, 1)
         end, function (self)
             if UpgradeData.picked or PlayerUpgrades[Upgrades[index].name] >= #Upgrades[index].list then
                 self.textColor = {.3,.3,.3}
@@ -2085,7 +2047,7 @@ function InitialiseUpgrades()
 
     NewButton("Continue", love.graphics.getWidth() / 2 - width / 2, love.graphics.getHeight() - 80, width, 40, "center", {0,1,0}, {0,0,0}, {.2,.2,.2}, {0,1,0}, Fonts.normal, 2, 10, 10, function (self)
         UpgradeData.picked, UpgradeData.picking = false, false
-        PlaySFX(SFX.playerSpawn, 0.5, 1)
+        zutil.playsfx(SFX.playerSpawn, 0.5, 1)
     end, nil, function ()
         return UpgradeData.picked
     end)
@@ -2108,7 +2070,7 @@ end
 function OpenUpgradeMenu()
     ShakeIntensity = 0
     UpgradeData.picking = true
-    PlaySFX(SFX.upgradeMenu, 0.7, 1)
+    zutil.playsfx(SFX.upgradeMenu, 0.7, 1)
 end
 function DrawUpgradeMenuOverlay()
     love.graphics.setColor(0,0,0, 0.5)
@@ -2193,7 +2155,7 @@ function DrawDebug()
 
     local enemiesRendered = 0
     for _, enemy in ipairs(Enemies) do
-        if Distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2) <= Player.renderDistance then
+        if zutil.distance(Player.centerX, Player.centerY, enemy.x + enemy.width / 2, enemy.y + enemy.width / 2) <= Player.renderDistance then
             enemiesRendered = enemiesRendered + 1
         end
     end
@@ -2207,7 +2169,7 @@ function DrawDebug()
 
     local turretsRendered = 0
     for _, turret in ipairs(Turrets) do
-        if Distance(Player.centerX, Player.centerY, turret.x, turret.y) <= Player.renderDistance then
+        if zutil.distance(Player.centerX, Player.centerY, turret.x, turret.y) <= Player.renderDistance then
             turretsRendered = turretsRendered + 1
         end
     end
@@ -2228,6 +2190,7 @@ end
 function UpdateMovables()
     UpdateTurrets()
     UpdateEnemies()
+    UpdateFlutters()
     CheckCollisionWithCheckpointsAndUpdateCloseToCheckpointStatus()
 end
 function GetThreadData()
@@ -2244,6 +2207,13 @@ function GetThreadData()
             if Enemies[index] then Enemies[index].render = data.render end
         end
     end
+
+    local dataFlutters = love.thread.getChannel("flutters"):pop()
+    if dataFlutters then
+        for index, data in ipairs(dataFlutters) do
+            if Flutters[index] then Flutters[index].render = data.render end
+        end
+    end
 end
 function SendThreadData()
     if CancelNextThreadSupply then
@@ -2255,6 +2225,9 @@ function SendThreadData()
     love.thread.getChannel("player"):push(Player)
 
     love.thread.getChannel("enemies to thread"):push(Enemies)
+    love.thread.getChannel("player"):push(Player)
+
+    love.thread.getChannel("flutters to thread"):push(Flutters)
     love.thread.getChannel("player"):push(Player)
 end
 

@@ -476,7 +476,7 @@ function UpdateDialogue()
 
                 Dialogue.playing.charIndex = Dialogue.playing.charIndex + 1
 
-                PlaySFX(SFX.dialogue, 0.6, math.random()/2+.7)
+                zutil.playsfx(SFX.dialogue, 0.6, math.random()/2+.7)
             end
         end
     else
@@ -504,7 +504,7 @@ function PlayDialogue(index, event)
 
     if Dialogue.list[index].voice and not event then
         Dialogue.list[index].voice:setEffect("player voice")
-        PlaySFX(Dialogue.list[index].voice, .6, 1)
+        zutil.playsfx(Dialogue.list[index].voice, .6, 1)
     end
 end
 function DrawDialogue()
@@ -521,5 +521,5 @@ end
 
 function IntelCallIn(text)
     NewMessage(string.upper(text), 0, 50, {0,1,0}, 230, Fonts.medium, nil, true)
-    PlaySFX(SFX.intel, 0.3, 1.4)
+    zutil.playsfx(SFX.intel, 0.3, 1.4)
 end
